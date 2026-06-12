@@ -134,7 +134,15 @@ The app talks directly to the `AcerGamingFunction` WMI class in the `root\WMI` n
 <img width="388" height="380" alt="image" src="https://github.com/user-attachments/assets/5a2d6423-8ab9-4a23-aa51-f14eb2a215d9" />
 <img width="484" height="137" alt="image" src="https://github.com/user-attachments/assets/f02178d9-92e5-4c1d-be54-587b0bff4b95" />
 
+---
+##  Strictly Not for Sale
 
+This is a **free, open-source utility** created for the community. 
+* **It is strictly prohibited to sell this software**, bundle it with commercial products, or use it for any commercial sales/marketing.
+* If you paid for this software, you have been scammed. Please report the seller and demand a refund.
+* Unauthorized commercial distribution or sale of this software will lead to immediate take-down requests and legal consequences.
+
+---
 ## License
 
 [MIT](LICENSE) — do whatever you want with it.
