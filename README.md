@@ -131,6 +131,9 @@ The app talks directly to the `AcerGamingFunction` WMI class in the `root\WMI` n
 > If something breaks — reflash your BIOS, reinstall PredatorSense, or restore from a backup. That's on you.
 
 ---
+<img width="388" height="380" alt="image" src="https://github.com/user-attachments/assets/5a2d6423-8ab9-4a23-aa51-f14eb2a215d9" />
+<img width="484" height="137" alt="image" src="https://github.com/user-attachments/assets/f02178d9-92e5-4c1d-be54-587b0bff4b95" />
+
 
 ## License
 
