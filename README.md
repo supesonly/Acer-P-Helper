@@ -6,14 +6,14 @@ A lightweight, open-source replacement for PredatorSense on Acer Predator laptop
 
 ## Features
 
-- ⚡ **Power Modes** — Silent, Balanced, Turbo, Turbo+, Eco (auto-switches with power state)
-- 🌀 **Fan Control** — Auto, Max, Custom
-- 🖥 **Display Refresh Rate** — Toggle between 60 Hz and your panel's max Hz
-- ⌨ **Keyboard RGB** — 8 lighting modes (Static, Breathing, Neon, Wave, Shifting, Zoom, Meteor, Twinkling) with brightness and speed control
-- 🌡 **Live CPU/GPU temperatures** in the title bar
-- 🔄 **System tray** — full control without opening the window
-- 💾 **Remembers your settings** across reboots via the registry
-- 🚀 **Runs on startup** automatically
+-  **Power Modes** — Silent, Balanced, Turbo, Turbo+, Eco (auto-switches with power state)
+-  **Fan Control** — Auto, Max, Custom
+-  **Display Refresh Rate** — Toggle between 60 Hz and your panel's max Hz
+-  **Keyboard RGB** — 8 lighting modes (Static, Breathing, Neon, Wave, Shifting, Zoom, Meteor, Twinkling) with brightness and speed control
+-  **Live CPU/GPU temperatures** in the title bar
+-  **System tray** — full control without opening the window
+-  **Remembers your settings** across reboots via the registry
+-  **Runs on startup** automatically
 
 ---
 
@@ -110,7 +110,7 @@ If you want to fully remove it:
 2. Search for **PredatorSense**
 3. Click the three dots → **Uninstall**
 
-> ⚠️ Do this **after** confirming Predator Control works correctly for you. Keep PredatorSense installed as a fallback until you're happy.
+>  Do this **after** confirming Predator Control works correctly for you. Keep PredatorSense installed as a fallback until you're happy.
 
 ---
 
@@ -122,7 +122,7 @@ The app talks directly to the `AcerGamingFunction` WMI class in the `root\WMI` n
 
 ## Disclaimer
 
-> ⚠️ **This app was built with the assistance of AI tools.**
+>  **This app was built with the assistance of AI tools.**
 >
 > It has been tested on **one system only** (an Acer Predator (Helios Neo 16) running Windows 11). Compatibility with other Predator models, Windows versions, or hardware configurations is not guaranteed.
 >
