@@ -17,14 +17,14 @@ namespace PredatorControlApp
         private ListBox? _listBox;
         private int _hoverIndex = -1;
 
-        private static readonly Color BgNormal = Color.FromArgb(50, 50, 55);
-        private static readonly Color BgHover = Color.FromArgb(62, 62, 68);
-        private static readonly Color BorderNormal = Color.FromArgb(65, 65, 72);
-        private static readonly Color BorderHover = Color.FromArgb(85, 85, 95);
+        private static readonly Color BgNormal = Color.FromArgb(37, 37, 40);
+        private static readonly Color BgHover = Color.FromArgb(48, 48, 52);
+        private static readonly Color BorderNormal = Color.FromArgb(60, 60, 66);
+        private static readonly Color BorderHover = Color.FromArgb(80, 80, 88);
         private static readonly Color Accent = Color.FromArgb(0, 200, 160);
-        private static readonly Color TextNormal = Color.FromArgb(200, 200, 210);
-        private static readonly Color DropBg = Color.FromArgb(36, 36, 40);
-        private static readonly Color DropHover = Color.FromArgb(55, 55, 62);
+        private static readonly Color TextNormal = Color.FromArgb(170, 170, 175);
+        private static readonly Color DropBg = Color.FromArgb(28, 28, 30);
+        private static readonly Color DropHover = Color.FromArgb(48, 48, 52);
 
         [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
         public int SelectedIndex

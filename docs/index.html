@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#121214" media="(prefers-color-scheme: dark)">
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+    <meta name="color-scheme" content="dark light">
+    <title>Predator Control | Lightweight Control for Acer Laptops</title>
+    <link rel="icon" type="image/x-icon" href="appicon.ico">
+    <meta name="description" content="Fast, native, and bloat-free open-source tool for tuning performance, fans, display refresh rate, and RGB lighting on Acer Predator laptops.">
+    
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Predator Control | Lightweight Acer Laptop Tuning">
+    <meta property="og:description" content="A lightweight, open-source replacement for PredatorSense. Tune power modes, fan speeds, screen Hz, and keyboard RGB on Windows 10/11.">
+    <meta property="og:url" content="https://github.com/supesonly/Acer-P-Helper">
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="style.css?v=5">
+</head>
+<body>
+    <canvas id="hero-canvas" class="hero-canvas" aria-hidden="true"></canvas>
+
+    <header class="nav-header">
+        <div class="nav-inner container">
+            <a class="nav-brand" href="#top">
+                <img src="appicon.ico" alt="Icon" width="20" height="20" style="vertical-align: middle; margin-right: 6px;"> Predator Control
+            </a>
+            <button type="button" class="nav-toggle" aria-expanded="false" aria-controls="nav-links" aria-label="Toggle menu" id="nav-toggle-btn">
+                <span></span><span></span><span></span>
+            </button>
+            <nav>
+                <ul class="nav-links" id="nav-links">
+                    <li><a href="#top">Home</a></li>
+                    <li><a href="#features">Features</a></li>
+                    <li><a href="#setup">Setup Guide</a></li>
+                    <li><a href="#requirements">Requirements</a></li>
+                    <li><a href="https://github.com/supesonly/Acer-P-Helper" target="_blank" rel="noopener">GitHub</a></li>
+                    <li class="nav-cta"><a href="#download" class="btn btn-nav">Download</a></li>
+
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <section class="hero-section" id="top">
+            <div class="container hero-inner">
+                <div class="hero-copy">
+                    <span class="hero-badge">⚡ Lightweight & Open Source</span>
+                    <h1 class="hero-title">The control app your Predator laptop deserves.</h1>
+                    <p class="hero-description">
+                        An ultra-fast, bloat-free system-tray tool for managing performance, fans, display refresh rate, and RGB backlighting on Acer Predator laptops. Zero background services, zero bloat, runs natively.
+                    </p>
+                    <div class="hero-btn-group">
+                        <a class="btn btn-primary" href="#download">
+                            <span>Get Predator Control</span>
+                        </a>
+                        <a class="btn btn-secondary" href="https://github.com/supesonly/Acer-P-Helper" target="_blank" rel="noopener">
+                            <svg class="btn-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>
+                            GitHub
+                        </a>
+                    </div>
+                    <div class="hero-stats">
+                        <div class="stat-bubble">
+                            <span class="stat-num">~1.74 MB</span>
+                            <span class="stat-label">Executable Size</span>
+                        </div>
+                        <div class="stat-bubble">
+                            <span class="stat-num">0%</span>
+                            <span class="stat-label">Telemetry & Bloat</span>
+                        </div>
+                        <div class="stat-bubble">
+                            <span class="stat-num">Native</span>
+                            <span class="stat-label">C# / WinForms</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="hero-mock">
+                    <div class="app-window">
+                        <div class="app-titlebar">
+                            <div class="app-title">
+                                <img src="appicon.ico" class="app-icon-img" width="16" height="16" alt="Icon"> Predator Control
+                            </div>
+                            <div class="app-controls">
+                                <span class="app-control-dot min"></span>
+                                <span class="app-control-dot close"></span>
+                            </div>
+                        </div>
+                        <div class="app-body">
+                            <div class="telemetry-bar">
+                                <div class="telemetry-col">
+                                    <div class="telemetry-item"><span class="tel-label">CPU:</span> <span class="tel-val tel-red" id="mock-cpu-temp">95°C</span></div>
+                                    <div class="telemetry-item"><span class="tel-label">Fan speed:</span> <span class="tel-val" id="mock-fan-speed">Auto</span></div>
+                                </div>
+                                <div class="telemetry-col">
+                                    <div class="telemetry-item"><span class="tel-label">GPU:</span> <span class="tel-val" id="mock-gpu-temp">--°C</span></div>
+                                    <div class="telemetry-item"><span class="tel-label">Power:</span> <span class="tel-val" id="mock-power-state">Performance</span></div>
+                                </div>
+                            </div>
+
+                            <hr class="app-divider" />
+
+                            <div class="control-groups">
+                                <div class="control-row">
+                                    <div class="row-header">POWER MODE</div>
+                                    <div class="button-grid grid-5" data-row="power-mode">
+                                        <button class="mock-btn" data-key="quiet" data-val="Quiet" data-cpu="56" data-gpu="50" data-fan="Silent">Quiet</button>
+                                        <button class="mock-btn" data-key="balanced" data-val="Balanced" data-cpu="70" data-gpu="65" data-fan="Auto">Balanced</button>
+                                        <button class="mock-btn active" data-key="performance" data-val="Performance" data-cpu="95" data-gpu="--" data-fan="Auto">Perf</button>
+                                        <button class="mock-btn" data-key="turbo" data-val="Turbo" data-cpu="98" data-gpu="80" data-fan="High">Turbo</button>
+                                        <button class="mock-btn" data-key="eco" data-val="Eco" data-cpu="45" data-gpu="40" data-fan="Eco">Eco</button>
+                                    </div>
+                                </div>
+
+                                <div class="control-row">
+                                    <div class="row-header">FAN CONTROL</div>
+                                    <div class="button-grid grid-3" data-row="fan-mode">
+                                        <button class="mock-btn active" data-key="auto" data-val="Auto" data-rpm-mult="1">Auto</button>
+                                        <button class="mock-btn" data-key="max" data-val="Max" data-rpm-mult="2.2">Max</button>
+                                        <button class="mock-btn" data-key="custom" data-val="Custom" data-rpm-mult="1.4">Custom</button>
+                                    </div>
+                                </div>
+
+                                <div class="control-row">
+                                    <div class="row-header">DISPLAY REFRESH RATE</div>
+                                    <div class="button-grid grid-2" data-row="display-mode">
+                                        <button class="mock-btn" data-key="60hz" data-val="60 Hz">60 Hz</button>
+                                        <button class="mock-btn active" data-key="maxhz" data-val="165 Hz (Max)">165 Hz (Max)</button>
+                                    </div>
+                                </div>
+
+                                <div class="control-row">
+                                    <div class="row-header">KEYBOARD RGB MODE</div>
+                                    <div class="select-container">
+                                        <select id="mock-rgb-select" class="mock-select">
+                                            <option value="Static" selected>Static</option>
+                                            <option value="Breathing">Breathing</option>
+                                            <option value="Neon">Neon</option>
+                                            <option value="Wave">Wave</option>
+                                            <option value="Shifting">Shifting</option>
+                                            <option value="Zoom">Zoom</option>
+                                            <option value="Meteor">Meteor</option>
+                                            <option value="Twinkling">Twinkling</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="control-row grid-2-cols slider-row">
+                                    <div class="slider-group">
+                                        <div class="row-header">BRIGHTNESS: <span id="val-brightness">0%</span></div>
+                                        <input type="range" class="mock-slider" id="slider-brightness" min="0" max="100" value="0">
+                                    </div>
+                                    <div class="slider-group">
+                                        <div class="row-header text-right">EFFECT SPEED: <span id="val-speed">1%</span></div>
+                                        <input type="range" class="mock-slider" id="slider-speed" min="1" max="100" value="1">
+                                    </div>
+                                </div>
+
+                                <div class="control-row color-customization-row">
+                                    <div class="row-header">COLOR CUSTOMIZATION</div>
+                                    <button class="mock-btn full-width" id="btn-choose-color">Choose Custom Color</button>
+                                </div>
+
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="stats-section">
+            <div class="container stats-inner">
+                <div class="stat-item">
+                    <span class="stat-value">100%</span>
+                    <span class="stat-desc">Clean & Open Source</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value">&lt; 30MB</span>
+                    <span class="stat-desc">RAM Footprint</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value">Zero</span>
+                    <span class="stat-desc">Background Services Installed</span>
+                </div>
+            </div>
+        </section>
+
+        <section class="features-section" id="features">
+            <div class="container">
+                <div class="section-heading-wrapper">
+                    <h2 class="section-title">Why choose Predator Control?</h2>
+                    <p class="section-subtitle">A native utility designed to give you direct command without the overhead.</p>
+                </div>
+                <div class="features-accordion">
+                    <div class="accordion-item">
+                        <button class="accordion-header">
+                            <span class="feature-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg></span>
+                            <span class="feature-title">Granular Power Modes</span>
+                            <span class="accordion-icon">+</span>
+                        </button>
+                        <div class="accordion-content">
+                            <div class="accordion-inner">
+                                <p>Toggle through Silent, Balanced, Performance, Turbo, and Eco modes. Auto-switches limits instantly depending on whether you're plugged in or on battery power.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="accordion-item">
+                        <button class="accordion-header">
+                            <span class="feature-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.827 16.379a6.082 6.082 0 0 1-8.618-7.002l5.412 1.45a6.082 6.082 0 0 1 7.002-8.618l-1.45 5.412a6.082 6.082 0 0 1 8.618 7.002l-5.412-1.45a6.082 6.082 0 0 1-7.002 8.618l1.45-5.412Z"/><path d="M12 12v.01"/></svg></span>
+                            <span class="feature-title">Smart Fan Tuning</span>
+                            <span class="accordion-icon">+</span>
+                        </button>
+                        <div class="accordion-content">
+                            <div class="accordion-inner">
+                                <p>Take charge of your cooling with Auto, Max, or Custom settings. Perfect for keeping temperatures low under heavy loads or dead silent during productivity.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="accordion-item">
+                        <button class="accordion-header">
+                            <span class="feature-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg></span>
+                            <span class="feature-title">Dynamic Refresh Rate</span>
+                            <span class="accordion-icon">+</span>
+                        </button>
+                        <div class="accordion-content">
+                            <div class="accordion-inner">
+                                <p>Easily switch between 60Hz to extend battery life on the go, and your panel's maximum refresh rate (up to 240Hz/360Hz) for gaming.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="accordion-item">
+                        <button class="accordion-header">
+                            <span class="feature-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2" ry="2"></rect><path d="M6 8h.001"></path><path d="M10 8h.001"></path><path d="M14 8h.001"></path><path d="M18 8h.001"></path><path d="M8 12h.001"></path><path d="M12 12h.001"></path><path d="M16 12h.001"></path><path d="M7 16h10"></path></svg></span>
+                            <span class="feature-title">8 Keyboard Lighting Modes</span>
+                            <span class="accordion-icon">+</span>
+                        </button>
+                        <div class="accordion-content">
+                            <div class="accordion-inner">
+                                <p>Complete control over keyboard backlight styles: Static, Breathing, Neon, Wave, Shifting, Zoom, Meteor, and Twinkling, with precise brightness/speed adjustments.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="accordion-item">
+                        <button class="accordion-header">
+                            <span class="feature-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg></span>
+                            <span class="feature-title">Persistent Profiles</span>
+                            <span class="accordion-icon">+</span>
+                        </button>
+                        <div class="accordion-content">
+                            <div class="accordion-inner">
+                                <p>Saves your custom configs in the Windows Registry so they load automatically on startup and persist cleanly across system reboots.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="accordion-item">
+                        <button class="accordion-header">
+                            <span class="feature-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 8.6-8 8.6S4 18 4 13"/><path d="M12 3v13"/><path d="M8 12l4 4 4-4"/></svg></span>
+                            <span class="feature-title">Tray-Only Design</span>
+                            <span class="accordion-icon">+</span>
+                        </button>
+                        <div class="accordion-content">
+                            <div class="accordion-inner">
+                                <p>Minimizes to the system tray on startup using a simple `-hidden` launch parameter. Change presets directly from the tray icon menu with a right click.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="setup-section" id="setup">
+            <div class="container">
+                <div class="section-heading-wrapper">
+                    <h2 class="section-title">Replacing PredatorSense</h2>
+                    <p class="section-subtitle">Since the app utilizes Acer's WMI interface directly, you can safely disable bloated OEM background services.</p>
+                </div>
+
+                <div class="setup-flow">
+                    <div class="setup-step">
+                        <div class="step-num">01</div>
+                        <div class="step-content">
+                            <h3>Disable PredatorSense Services</h3>
+                            <p>Open <strong>Services</strong> (<code>Win + R</code> → type <code>services.msc</code> → press Enter) and set these services to <strong>Disabled</strong> to stop background resource hogging:</p>
+                            <ul class="services-list">
+                                <li><code>Acer Gaming Service</code> — Main daemon</li>
+                                <li><code>Acer Quick Access Service</code> — OSD utilities</li>
+                                <li><code>AcerService</code> — Core update manager</li>
+                                <li><code>Acer Power Button Service</code> — Button polling</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="setup-step">
+                        <div class="step-num">02</div>
+                        <div class="step-content">
+                            <h3>Remove from Startup</h3>
+                            <p>Open <strong>Task Manager</strong> (<code>Ctrl + Shift + Esc</code>), navigate to the <strong>Startup Apps</strong> tab, find <strong>PredatorSense</strong>, and click <strong>Disable</strong>.</p>
+                        </div>
+                    </div>
+
+                    <div class="setup-step">
+                        <div class="step-num">03</div>
+                        <div class="step-content">
+                            <h3>Launch Predator Control</h3>
+                            <p>Right-click the downloaded <code>PredatorControlApp.exe</code> and choose <strong>Run as administrator</strong> (necessary for communicating with the WMI hardware layers). The app registers itself on startup automatically.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="requirements-section" id="requirements">
+            <div class="container">
+                <div class="requirements-card">
+                    <h2 class="section-title">System Requirements</h2>
+                    <div class="req-grid">
+                        <div class="req-item">
+                            <h4>Hardware</h4>
+                            <p>Acer Predator laptop supporting the <code>AcerGamingFunction</code> WMI interface.</p>
+                        </div>
+                        <div class="req-item">
+                            <h4>OS</h4>
+                            <p>Windows 10 or Windows 11 (64-bit builds recommended).</p>
+                        </div>
+                        <div class="req-item">
+                            <h4>Runtime</h4>
+                            <p>.NET 10.0 Runtime or newer is required to execute the application.</p>
+                        </div>
+                        <div class="req-item">
+                            <h4>Permissions</h4>
+                            <p>Must run with Administrator privileges to send hardware commands.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="download-section" id="download">
+            <div class="container download-inner">
+                <h2 class="section-title">Ready to take control?</h2>
+                <p class="section-subtitle">Experience a fast, zero-bloat laptop environment today.</p>
+                <div class="download-cta">
+                    <a href="https://github.com/supesonly/Acer-P-Helper/releases" class="btn btn-primary btn-large">
+                        Download Latest Release (.exe)
+                    </a>
+                </div>
+                <div class="download-disclaimer">
+                    <p><strong>Disclaimer:</strong> This application is free, open source, and built by volunteers. It is not affiliated with or endorsed by Acer Inc. Use it at your own risk.</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <div class="container footer-inner">
+            <p>&copy; 2026 Predator Control Project. Licensed under the MIT License.</p>
+            <p>Inspired by G-Helper. Handcrafted with care.</p>
+        </div>
+    </footer>
+
+    <script src="app.js?v=5"></script>
+</body>
+</html>

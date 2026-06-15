@@ -12,16 +12,16 @@ namespace PredatorControlApp
         private bool _isActive;
         private Color? _customActiveColor;
 
-        private static readonly Color BgNormal = Color.FromArgb(50, 50, 55);
-        private static readonly Color BgHover = Color.FromArgb(62, 62, 68);
+        private static readonly Color BgNormal = Color.FromArgb(37, 37, 40);
+        private static readonly Color BgHover = Color.FromArgb(48, 48, 52);
         private static readonly Color BgActive = Color.FromArgb(20, 50, 45);
-        private static readonly Color BgDisabled = Color.FromArgb(35, 35, 38);
-        private static readonly Color BorderNormal = Color.FromArgb(65, 65, 72);
-        private static readonly Color BorderHover = Color.FromArgb(85, 85, 95);
-        private static readonly Color BorderDisabled = Color.FromArgb(45, 45, 50);
+        private static readonly Color BgDisabled = Color.FromArgb(28, 28, 30);
+        private static readonly Color BorderNormal = Color.FromArgb(60, 60, 66);
+        private static readonly Color BorderHover = Color.FromArgb(80, 80, 88);
+        private static readonly Color BorderDisabled = Color.FromArgb(40, 40, 44);
         private static readonly Color Accent = Color.FromArgb(0, 200, 160);
-        private static readonly Color TextNormal = Color.FromArgb(190, 190, 200);
-        private static readonly Color TextDisabled = Color.FromArgb(75, 75, 85);
+        private static readonly Color TextNormal = Color.FromArgb(170, 170, 175);
+        private static readonly Color TextDisabled = Color.FromArgb(70, 70, 75);
 
         [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
         public bool IsActive
