@@ -6,7 +6,7 @@ A lightweight, open-source replacement for PredatorSense on Acer Predator laptop
 
 ## Features
 
--  **Power Modes** — Silent, Balanced, Turbo, Turbo+, Eco (auto-switches with power state)
+-  **Power Modes** — Silent, Balanced, Performance, Turbo, Eco (auto-switches with power state)
 -  **Fan Control** — Auto, Max, Custom
 -  **Display Refresh Rate** — Toggle between 60 Hz and your panel's max Hz
 -  **Keyboard RGB** — 8 lighting modes (Static, Breathing, Neon, Wave, Shifting, Zoom, Meteor, Twinkling) with brightness and speed control
