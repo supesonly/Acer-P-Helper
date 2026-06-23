@@ -115,6 +115,17 @@ namespace PredatorControlApp
         private PredatorSlider _brightnessSlider = null!, _speedSlider = null!;
         
         private PredatorButton? _activePowerBtn, _activeFanBtn, _activeDisplayBtn;
+        private bool _isUpdatingBattery;
+
+        private PredatorSwitch _switchBatteryLimit = null!;
+        private Label _lblBatteryStatus = null!;
+
+        
+        private GameSyncController _gameSync = null!;
+        private PredatorToggle _switchGameSync = null!;
+        private Label _lblGameSyncStatus = null!;
+        private PredatorButton _btnConfigureGames = null!;
+        private bool _isGameSyncOverriding;
 
         private static readonly string[] RgbModeNames = { "Static", "Breathing", "Neon", "Wave", "Shifting", "Zoom", "Meteor", "Twinkling" };
 
@@ -122,6 +133,8 @@ namespace PredatorControlApp
                                   _trayPowerTurbo = null!, _trayPowerEco = null!;
         private ToolStripMenuItem _trayFanAuto = null!, _trayFanMax = null!, _trayFanCustom = null!;
         private ToolStripMenuItem _trayDisplay60 = null!, _trayDisplayMax = null!;
+        private ToolStripMenuItem _trayBatteryLimit80 = null!, _trayBatteryLimit100 = null!;
+        private ToolStripMenuItem _trayBatteryMenu = null!;
         private ToolStripMenuItem _trayRgbStatic = null!, _trayRgbBreathe = null!, _trayRgbNeon = null!,
                                   _trayRgbWave = null!, _trayRgbShift = null!, _trayRgbZoom = null!,
                                   _trayRgbMeteor = null!, _trayRgbTwinkle = null!;
@@ -168,6 +181,16 @@ namespace PredatorControlApp
             }
 
             LoadMemory();
+
+            _gameSync = new GameSyncController();
+            _gameSync.GameDetected += OnGameDetected;
+            _gameSync.GameExited += OnGameExited;
+
+            if (_gameSync.IsEnabled)
+            {
+                _switchGameSync.Checked = true;
+                _lblGameSyncStatus.Text = "Active \u2014 Monitoring";
+            }
 
             _timer.Interval = 2000;
             _timer.Tick += UpdateTelemetry;
@@ -237,7 +260,7 @@ namespace PredatorControlApp
         {
             _trayMenu = new ContextMenuStrip();
 
-            var powerMenu = new ToolStripMenuItem("⚡  Power Mode");
+            var powerMenu = new ToolStripMenuItem("  Power Mode"); 
             _trayPowerQuiet = new ToolStripMenuItem("Quiet", null, (s, e) => ApplyPowerMode(0x00, _btnQuiet));
             _trayPowerBal = new ToolStripMenuItem("Balanced", null, (s, e) => ApplyPowerMode(0x01, _btnBalanced));
             _trayPowerPerf = new ToolStripMenuItem("Performance", null, (s, e) => ApplyPowerMode(0x04, _btnPerform));
@@ -245,18 +268,18 @@ namespace PredatorControlApp
             _trayPowerEco = new ToolStripMenuItem("Eco", null, (s, e) => ApplyPowerMode(0x06, _btnEco));
             powerMenu.DropDownItems.AddRange([_trayPowerQuiet, _trayPowerBal, _trayPowerPerf, _trayPowerTurbo, _trayPowerEco]);
 
-            var fanMenu = new ToolStripMenuItem("🌀  Fan Mode");
+            var fanMenu = new ToolStripMenuItem("  Fan Mode");
             _trayFanAuto = new ToolStripMenuItem("Auto", null, (s, e) => ApplyFanMode(0x01, _btnAutoFan));
             _trayFanMax = new ToolStripMenuItem("Max", null, (s, e) => ApplyFanMode(0x02, _btnMaxFan));
             _trayFanCustom = new ToolStripMenuItem("Custom", null, (s, e) => ApplyFanMode(0x03, _btnCustomFan));
             fanMenu.DropDownItems.AddRange([_trayFanAuto, _trayFanMax, _trayFanCustom]);
 
-            var displayMenu = new ToolStripMenuItem("📺  Display");
+            var displayMenu = new ToolStripMenuItem("  Display");
             _trayDisplay60 = new ToolStripMenuItem("60 Hz", null, (s, e) => ApplyDisplayMode(60, _btn60Hz));
             _trayDisplayMax = new ToolStripMenuItem($"{_maxHz} Hz", null, (s, e) => ApplyDisplayMode(_maxHz, _btnMaxHz));
             displayMenu.DropDownItems.AddRange([_trayDisplay60, _trayDisplayMax]);
 
-            var rgbMenu = new ToolStripMenuItem("🎨  Keyboard RGB");
+            var rgbMenu = new ToolStripMenuItem("  Keyboard RGB");
             _trayRgbStatic = new ToolStripMenuItem("Static", null, (s, e) => ApplyRgbModeFromDropdown(0));
             _trayRgbBreathe = new ToolStripMenuItem("Breathing", null, (s, e) => ApplyRgbModeFromDropdown(1));
             _trayRgbNeon = new ToolStripMenuItem("Neon", null, (s, e) => ApplyRgbModeFromDropdown(2));
@@ -268,9 +291,15 @@ namespace PredatorControlApp
             rgbMenu.DropDownItems.AddRange([_trayRgbStatic, _trayRgbBreathe, _trayRgbNeon, _trayRgbWave,
                                             _trayRgbShift, _trayRgbZoom, _trayRgbMeteor, _trayRgbTwinkle]);
 
+            _trayBatteryMenu = new ToolStripMenuItem("  Battery Limit");
+            _trayBatteryLimit80 = new ToolStripMenuItem("Limit to 80%", null, (s, e) => ApplyBatteryLimit(true));
+            _trayBatteryLimit100 = new ToolStripMenuItem("Full Charge (100%)", null, (s, e) => ApplyBatteryLimit(false));
+            _trayBatteryMenu.DropDownItems.AddRange([_trayBatteryLimit80, _trayBatteryLimit100]);
+
             _trayMenu.Items.Add(powerMenu);
             _trayMenu.Items.Add(fanMenu);
             _trayMenu.Items.Add(displayMenu);
+            _trayMenu.Items.Add(_trayBatteryMenu);
             _trayMenu.Items.Add(rgbMenu);
             _trayMenu.Items.Add(new ToolStripSeparator());
             _trayMenu.Items.Add("Open Dashboard", null, (s, e) => ShowApp());
@@ -288,7 +317,7 @@ namespace PredatorControlApp
             this.ForeColor = Color.White;
 
             _formW = S(450);
-            this.ClientSize = new Size(_formW, S(660));
+            this.ClientSize = new Size(_formW, S(880));
             this.FormBorderStyle = FormBorderStyle.None;
             this.StartPosition = FormStartPosition.CenterScreen;
             try { this.Icon = new Icon("appicon.ico"); } catch { }
@@ -379,6 +408,26 @@ namespace PredatorControlApp
             _btnMaxHz.Click += (s, e) => ApplyDisplayMode(_maxHz, _btnMaxHz);
 
             y += btnH + S(28);
+            MakeSectionHeader("BATTERY CHARGE LIMIT", pad, y);
+
+            y += S(24);
+            int switchH = S(30);
+            _lblBatteryStatus = MakeLabel("Full Charge (100%)", pad, y, FontBody, SubHeaderColor);
+            CenterV(_lblBatteryStatus, y, switchH);
+
+            _switchBatteryLimit = new PredatorSwitch
+            {
+                Location = new Point(_formW - pad - S(60), y),
+                Size = new Size(S(60), switchH)
+            };
+            this.Controls.Add(_switchBatteryLimit);
+
+            _switchBatteryLimit.CheckedChanged += (s, e) =>
+            {
+                ApplyBatteryLimit(_switchBatteryLimit.Checked);
+            };
+
+            y += switchH + S(28);
             MakeSectionHeader("KEYBOARD RGB MODE", pad, y);
             
             y += S(24);
@@ -408,6 +457,7 @@ namespace PredatorControlApp
 
             _rgbDropDown.SelectedIndexChanged += (s, e) =>
             {
+                if (_isGameSyncOverriding) return; 
                 int mode = _rgbDropDown.SelectedIndex;
                 if (mode == 0)
                 {
@@ -450,6 +500,37 @@ namespace PredatorControlApp
                     CheckRgbTrayFromMode(0);
                 }
             };
+
+            y += btnH + S(28);
+            AddSeparator(y);
+            y += S(20);
+            MakeSectionHeader("GAME SYNC", pad, y);
+
+            y += S(24);
+            int syncSwitchH = S(30);
+            _lblGameSyncStatus = MakeLabel("Disabled", pad, y, FontBody, SubHeaderColor);
+            CenterV(_lblGameSyncStatus, y, syncSwitchH);
+
+            _switchGameSync = new PredatorToggle
+            {
+                Location = new Point(_formW - pad - S(48), y),
+                Size = new Size(S(48), syncSwitchH)
+            };
+            this.Controls.Add(_switchGameSync);
+
+            _switchGameSync.CheckedChanged += (s, e) =>
+            {
+                _gameSync.IsEnabled = _switchGameSync.Checked;
+                _lblGameSyncStatus.Text = _switchGameSync.Checked ? "Active — Monitoring" : "Disabled";
+            };
+
+            y += syncSwitchH + S(10);
+            _btnConfigureGames = MakeButton("🎮  Configure Executables", pad, y, contentW, btnH);
+            _btnConfigureGames.Click += (s, e) =>
+            {
+                using var form = new GameSyncForm(_gameSync, _maxHz);
+                form.ShowDialog(this);
+            };
         }
 
         private void UpdateRgbControls(int mode)
@@ -485,6 +566,11 @@ namespace PredatorControlApp
         {
             int pad = S(24);
             this.Controls.Add(new Panel { Location = new Point(pad, y), Size = new Size(_formW - pad * 2, 1), BackColor = SeparatorColor });
+        }
+
+        private void CenterV(Label lbl, int controlY, int controlH)
+        {
+            lbl.Location = new Point(lbl.Left, controlY + (controlH - lbl.Height) / 2);
         }
 
         #endregion
@@ -546,6 +632,33 @@ namespace PredatorControlApp
             CheckTrayItem(hz <= 60 ? _trayDisplay60 : _trayDisplayMax, _trayDisplay60, _trayDisplayMax);
         }
 
+        private void ApplyBatteryLimit(bool limit)
+        {
+            if (_isUpdatingBattery) return;
+            _isUpdatingBattery = true;
+
+            try
+            {
+                if (_wmi.SetBatteryChargeLimit(limit))
+                {
+                    if (_switchBatteryLimit.Checked != limit)
+                        _switchBatteryLimit.Checked = limit;
+
+                    _lblBatteryStatus.Text = limit ? "Limit to 80% (Health)" : "Full Charge (100%)";
+                    CheckTrayItem(limit ? _trayBatteryLimit80 : _trayBatteryLimit100, _trayBatteryLimit80, _trayBatteryLimit100);
+                    SaveState("BatteryLimit", limit ? 1 : 0);
+                }
+                else
+                {
+                    _switchBatteryLimit.Checked = !limit;
+                }
+            }
+            finally
+            {
+                _isUpdatingBattery = false;
+            }
+        }
+
         private void ApplyRgbModeFromDropdown(int mode)
         {
             byte bright = (byte)_brightnessSlider.Value;
@@ -580,10 +693,145 @@ namespace PredatorControlApp
 
         #endregion
 
+        #region Game Sync Handlers
+
+        private DashboardSnapshot CaptureCurrentState()
+        {
+            return new DashboardSnapshot
+            {
+                PowerMode = GetCurrentPowerByte(),
+                FanMode = GetCurrentFanByte(),
+                RefreshRate = GetCurrentRefreshRate(),
+                BatteryLimit = _switchBatteryLimit.Checked ? 1 : 0,
+                RgbMode = _rgbDropDown.SelectedIndex,
+                RgbBrightness = _brightnessSlider.Value,
+                RgbSpeed = _speedSlider.Value,
+                RgbR = _wmi.LastR,
+                RgbG = _wmi.LastG,
+                RgbB = _wmi.LastB,
+            };
+        }
+
+        private byte GetCurrentPowerByte()
+        {
+            if (_activePowerBtn == _btnQuiet) return 0x00;
+            if (_activePowerBtn == _btnPerform) return 0x04;
+            if (_activePowerBtn == _btnTurbo) return 0x05;
+            if (_activePowerBtn == _btnEco) return 0x06;
+            return 0x01; 
+        }
+
+        private byte GetCurrentFanByte()
+        {
+            if (_activeFanBtn == _btnMaxFan) return 0x02;
+            if (_activeFanBtn == _btnCustomFan) return 0x03;
+            return 0x01; 
+        }
+
+        private PredatorButton PowerByteToBtn(byte mode) => mode switch
+        {
+            0x00 => _btnQuiet,
+            0x04 => _btnPerform,
+            0x05 => _btnTurbo,
+            0x06 => _btnEco,
+            _ => _btnBalanced
+        };
+
+        private PredatorButton FanByteToBtn(byte mode) => mode switch
+        {
+            0x02 => _btnMaxFan,
+            0x03 => _btnCustomFan,
+            _ => _btnAutoFan
+        };
+
+        private async void OnGameDetected(GameProfile profile)
+        {
+            if (InvokeRequired) { Invoke(() => OnGameDetected(profile)); return; }
+
+            _isGameSyncOverriding = true;
+            _lblGameSyncStatus.Text = $"Active \u2014 {profile.DisplayName}";
+
+            _gameSync.SetPreGameSnapshot(CaptureCurrentState());
+
+            ApplyPowerMode(profile.PowerMode, PowerByteToBtn(profile.PowerMode));
+            ApplyFanMode(profile.FanMode, FanByteToBtn(profile.FanMode));
+
+            if (profile.RefreshRate >= 0)
+            {
+                int hz = profile.RefreshRate;
+                SetRefreshRate(hz);
+                HighlightBtn(hz <= 60 ? _btn60Hz : _btnMaxHz, ref _activeDisplayBtn);
+                CheckTrayItem(hz <= 60 ? _trayDisplay60 : _trayDisplayMax, _trayDisplay60, _trayDisplayMax);
+            }
+
+            if (profile.BatteryLimit >= 0)
+                ApplyBatteryLimit(profile.BatteryLimit == 1);
+
+            await Task.Delay(500);
+            if (IsDisposed) return;
+
+            if (profile.RgbMode >= 0)
+            {
+                int mode = profile.RgbMode;
+                byte bright = profile.RgbBrightness >= 0 ? (byte)profile.RgbBrightness : (byte)_brightnessSlider.Value;
+                byte speed = profile.RgbSpeed >= 0 ? (byte)Math.Clamp(Math.Round(profile.RgbSpeed * 9.0 / 100.0), 1, 9) : GetMappedSpeed();
+                byte r = profile.RgbR >= 0 ? (byte)profile.RgbR : _wmi.LastR;
+                byte g = profile.RgbG >= 0 ? (byte)profile.RgbG : _wmi.LastG;
+                byte b = profile.RgbB >= 0 ? (byte)profile.RgbB : _wmi.LastB;
+
+                _wmi.SetRgbMode(mode, r, g, b, bright, speed, 0);
+                if (_rgbDropDown.SelectedIndex != mode)
+                    _rgbDropDown.SelectedIndex = mode;
+                if (profile.RgbBrightness >= 0)
+                    _brightnessSlider.Value = profile.RgbBrightness;
+                if (profile.RgbSpeed >= 0)
+                    _speedSlider.Value = profile.RgbSpeed;
+                UpdateRgbControls(mode);
+                CheckRgbTrayFromMode(mode);
+            }
+
+            _isGameSyncOverriding = false;
+        }
+
+        private async void OnGameExited(DashboardSnapshot snap)
+        {
+            if (InvokeRequired) { Invoke(() => OnGameExited(snap)); return; }
+
+            _isGameSyncOverriding = true;
+            _lblGameSyncStatus.Text = "Active \u2014 Monitoring";
+
+            ApplyPowerMode(snap.PowerMode, PowerByteToBtn(snap.PowerMode));
+            ApplyFanMode(snap.FanMode, FanByteToBtn(snap.FanMode));
+
+            SetRefreshRate(snap.RefreshRate);
+            HighlightBtn(snap.RefreshRate <= 60 ? _btn60Hz : _btnMaxHz, ref _activeDisplayBtn);
+            CheckTrayItem(snap.RefreshRate <= 60 ? _trayDisplay60 : _trayDisplayMax, _trayDisplay60, _trayDisplayMax);
+
+            ApplyBatteryLimit(snap.BatteryLimit == 1);
+
+            await Task.Delay(500);
+            if (IsDisposed) return;
+
+            _wmi.SetRgbMode(snap.RgbMode, (byte)snap.RgbR, (byte)snap.RgbG, (byte)snap.RgbB,
+                            (byte)snap.RgbBrightness,
+                            (byte)Math.Clamp(Math.Round(snap.RgbSpeed * 9.0 / 100.0), 1, 9), 0);
+            if (_rgbDropDown.SelectedIndex != snap.RgbMode)
+                _rgbDropDown.SelectedIndex = snap.RgbMode;
+            _brightnessSlider.Value = snap.RgbBrightness;
+            _speedSlider.Value = snap.RgbSpeed;
+            UpdateRgbControls(snap.RgbMode);
+            CheckRgbTrayFromMode(snap.RgbMode);
+
+            _isGameSyncOverriding = false;
+        }
+
+        #endregion
+
         #region State Persistence
 
         private void SaveState(string name, int value)
         {
+            if (_isGameSyncOverriding) return; 
             try
             {
                 using var key = Registry.CurrentUser.CreateSubKey(@"SOFTWARE\PredatorControl");
@@ -642,6 +890,32 @@ namespace PredatorControlApp
                 else
                 {
                     ApplyRgbModeFromDropdown(clampedMode);
+                }
+
+                if (_wmi.IsBatteryControlSupported())
+                {
+                    int savedBatteryLimit = (int)key.GetValue("BatteryLimit", 0);
+                    bool limitEnabled = savedBatteryLimit == 1;
+
+                    _wmi.SetBatteryChargeLimit(limitEnabled);
+
+                    _isUpdatingBattery = true;
+                    _switchBatteryLimit.Checked = limitEnabled;
+                    _lblBatteryStatus.Text = limitEnabled ? "Limit to 80% (Health)" : "Full Charge (100%)";
+                    CheckTrayItem(limitEnabled ? _trayBatteryLimit80 : _trayBatteryLimit100, _trayBatteryLimit80, _trayBatteryLimit100);
+                    _isUpdatingBattery = false;
+                }
+                else
+                {
+                    _isUpdatingBattery = true;
+                    _switchBatteryLimit.Checked = false;
+                    _switchBatteryLimit.Enabled = false;
+                    _lblBatteryStatus.Text = "Not Supported";
+                    _lblBatteryStatus.ForeColor = SubHeaderColor;
+                    _trayBatteryLimit80.Enabled = false;
+                    _trayBatteryLimit100.Enabled = false;
+                    _trayBatteryMenu.Enabled = false;
+                    _isUpdatingBattery = false;
                 }
             }
             catch { }
@@ -757,6 +1031,7 @@ namespace PredatorControlApp
             {
                 _trayIcon.Visible = false;
                 _timer.Stop();
+                _gameSync.Dispose();
                 _appMutex.Dispose();
                 base.OnFormClosing(e);
             }

@@ -196,6 +196,54 @@ namespace PredatorControlApp
             catch { }
         }
 
+        private ManagementObject? GetBatteryControlObject()
+        {
+            try
+            {
+                using var searcher = new ManagementObjectSearcher(@"root\WMI", "SELECT * FROM BatteryControl");
+                return searcher.Get().Cast<ManagementObject>().FirstOrDefault();
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        public bool SetBatteryChargeLimit(bool enable)
+        {
+            try
+            {
+                using var obj = GetBatteryControlObject();
+                if (obj == null) return false;
+
+                using var inParams = obj.GetMethodParameters("SetBatteryHealthControl");
+                inParams["uBatteryNo"] = (byte)1;
+                inParams["uFunctionMask"] = (byte)1;
+                inParams["uFunctionStatus"] = (byte)(enable ? 1 : 0);
+                inParams["uReservedIn"] = new byte[] { 0, 0, 0, 0, 0 };
+
+                using var outParams = obj.InvokeMethod("SetBatteryHealthControl", inParams, null);
+                ushort result = Convert.ToUInt16(outParams["uReturn"]);
+                return result == 0;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+        public bool IsBatteryControlSupported()
+        {
+            try
+            {
+                using var obj = GetBatteryControlObject();
+                return obj != null;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         public void Dispose()
         {
             lock (_lock)
