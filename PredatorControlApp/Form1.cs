@@ -102,17 +102,28 @@ namespace PredatorControlApp
         private Label _lblTitle = null!, _lblCpuTemp = null!, _lblGpuTemp = null!;
         private Label _lblPowerStatus = null!, _lblFanStatus = null!;
         private Label _lblBrightHdr = null!, _lblSpeedHdr = null!;
+        private Label _lblCpuFanSpeedHdr = null!, _lblGpuFanSpeedHdr = null!;
 
         private PredatorButton _btnQuiet = null!, _btnBalanced = null!, _btnPerform = null!,
                                _btnTurbo = null!, _btnEco = null!;
 
         private PredatorButton _btnAutoFan = null!, _btnMaxFan = null!, _btnCustomFan = null!;
+        private PredatorButton _btnFixedSpeed = null!, _btnFanCurve = null!;
+        private PredatorButton? _activeCustomSubBtn;
         private PredatorButton _btn60Hz = null!, _btnMaxHz = null!;
 
         private PredatorDropDown _rgbDropDown = null!;
         private PredatorButton _btnColorPick = null!;
 
         private PredatorSlider _brightnessSlider = null!, _speedSlider = null!;
+        private PredatorSlider _cpuFanSlider = null!, _gpuFanSlider = null!;
+
+        private FanCurveForm? _fanCurveForm;
+        private bool _fanCurveEnabled;
+        private List<Point> _cpuCurvePoints = new() { new(30,10), new(45,15), new(55,30), new(65,50), new(72,65), new(80,80), new(88,92), new(95,100) };
+        private List<Point> _gpuCurvePoints = new() { new(30,10), new(45,15), new(55,30), new(65,50), new(72,65), new(80,80), new(88,92), new(95,100) };
+        private int _lastCurveCpuSpeed = -1;
+        private int _lastCurveGpuSpeed = -1;
         
         private PredatorButton? _activePowerBtn, _activeFanBtn, _activeDisplayBtn;
         private bool _isUpdatingBattery;
@@ -317,7 +328,7 @@ namespace PredatorControlApp
             this.ForeColor = Color.White;
 
             _formW = S(450);
-            this.ClientSize = new Size(_formW, S(880));
+            this.ClientSize = new Size(_formW, S(948));
             this.FormBorderStyle = FormBorderStyle.None;
             this.StartPosition = FormStartPosition.CenterScreen;
             try { this.Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { }
@@ -397,7 +408,78 @@ namespace PredatorControlApp
             _btnMaxFan.Click += (s, e) => ApplyFanMode(0x02, _btnMaxFan);
             _btnCustomFan.Click += (s, e) => ApplyFanMode(0x03, _btnCustomFan);
 
-            y += btnH + S(28);
+            y += btnH + S(12);
+            int fanSliderW = (contentW - gap) / 2;
+            _lblCpuFanSpeedHdr = MakeLabel("CPU FAN: 50%", pad, y, FontSectionHeader, SubHeaderColor);
+            _lblGpuFanSpeedHdr = MakeLabel("GPU FAN: 50%", pad + fanSliderW + gap, y, FontSectionHeader, SubHeaderColor);
+            _lblCpuFanSpeedHdr.Visible = false;
+            _lblGpuFanSpeedHdr.Visible = false;
+
+            y += S(24);
+            _cpuFanSlider = new PredatorSlider
+            {
+                Location = new Point(pad, y),
+                Size     = new Size(fanSliderW, S(28)),
+                Minimum  = 10, Maximum = 100, Value = 50,
+                Visible  = false
+            };
+            _gpuFanSlider = new PredatorSlider
+            {
+                Location = new Point(pad + fanSliderW + gap, y),
+                Size     = new Size(fanSliderW, S(28)),
+                Minimum  = 10, Maximum = 100, Value = 50,
+                Visible  = false
+            };
+            this.Controls.Add(_cpuFanSlider);
+            this.Controls.Add(_gpuFanSlider);
+
+            _cpuFanSlider.ValueChanged   += (s, e) => _lblCpuFanSpeedHdr.Text = $"CPU FAN: {_cpuFanSlider.Value}%";
+            _gpuFanSlider.ValueChanged   += (s, e) => _lblGpuFanSpeedHdr.Text = $"GPU FAN: {_gpuFanSlider.Value}%";
+
+            _cpuFanSlider.ValueCommitted += (s, e) =>
+            {
+                _wmi.SetCpuFanSpeed((byte)_cpuFanSlider.Value);
+                SaveState("FanSpeedCpu", _cpuFanSlider.Value);
+            };
+            _gpuFanSlider.ValueCommitted += (s, e) =>
+            {
+                _wmi.SetGpuFanSpeed((byte)_gpuFanSlider.Value);
+                SaveState("FanSpeedGpu", _gpuFanSlider.Value);
+            };
+
+            y += S(28) + S(8);
+            int subBtnW = (contentW - gap) / 2;
+            _btnFixedSpeed = MakeButton("Fixed Speed", pad, y, subBtnW, btnH);
+            _btnFanCurve = MakeButton("Curve", pad + subBtnW + gap, y, subBtnW, btnH);
+            _btnFixedSpeed.Visible = false;
+            _btnFanCurve.Visible = false;
+
+            _btnFixedSpeed.Click += (s, e) =>
+            {
+                _fanCurveEnabled = false;
+                _lastCurveCpuSpeed = -1;
+                _lastCurveGpuSpeed = -1;
+                HighlightBtn(_btnFixedSpeed, ref _activeCustomSubBtn);
+                SaveState("FanCurveEnabled", 0);
+
+                _cpuFanSlider.Enabled = true;
+                _gpuFanSlider.Enabled = true;
+
+                _wmi.SetCpuFanSpeed((byte)_cpuFanSlider.Value);
+                _wmi.SetGpuFanSpeed((byte)_gpuFanSlider.Value);
+            };
+
+            _btnFanCurve.Click += (s, e) =>
+            {
+                HighlightBtn(_btnFanCurve, ref _activeCustomSubBtn);
+
+                _cpuFanSlider.Enabled = false;
+                _gpuFanSlider.Enabled = false;
+
+                OpenFanCurveEditor();
+            };
+
+            y += btnH + S(20);
             MakeSectionHeader("DISPLAY REFRESH RATE", pad, y);
             
             y += S(24);
@@ -617,6 +699,40 @@ namespace PredatorControlApp
                 _ => "Auto"
             };
 
+            bool isCustom = mode == 0x03;
+            _lblCpuFanSpeedHdr.Visible = isCustom;
+            _lblGpuFanSpeedHdr.Visible = isCustom;
+            _cpuFanSlider.Visible = isCustom;
+            _gpuFanSlider.Visible = isCustom;
+            _btnFixedSpeed.Visible = isCustom;
+            _btnFanCurve.Visible = isCustom;
+
+            if (isCustom)
+            {
+                if (_fanCurveEnabled)
+                {
+                    HighlightBtn(_btnFanCurve, ref _activeCustomSubBtn);
+                    _cpuFanSlider.Enabled = false;
+                    _gpuFanSlider.Enabled = false;
+                }
+                else
+                {
+                    HighlightBtn(_btnFixedSpeed, ref _activeCustomSubBtn);
+                    _cpuFanSlider.Enabled = true;
+                    _gpuFanSlider.Enabled = true;
+                }
+            }
+            else
+            {
+                _lastCurveCpuSpeed = -1;
+                _lastCurveGpuSpeed = -1;
+                if (_activeCustomSubBtn != null)
+                {
+                    _activeCustomSubBtn.IsActive = false;
+                    _activeCustomSubBtn = null;
+                }
+            }
+
             var trayItem = mode switch
             {
                 0x01 => _trayFanAuto,
@@ -624,6 +740,84 @@ namespace PredatorControlApp
                 _ => _trayFanCustom
             };
             CheckTrayItem(trayItem, _trayFanAuto, _trayFanMax, _trayFanCustom);
+        }
+
+        private void OpenFanCurveEditor()
+        {
+            if (_fanCurveForm != null && !_fanCurveForm.IsDisposed)
+            {
+                _fanCurveForm.Activate();
+                return;
+            }
+
+            _fanCurveForm = new FanCurveForm();
+            _fanCurveForm.SetCpuCurve(_cpuCurvePoints);
+            _fanCurveForm.SetGpuCurve(_gpuCurvePoints);
+            _fanCurveForm.UpdateTemps(_cpuTemp, _gpuTemp);
+
+            _fanCurveForm.ApplyClicked += (s, args) =>
+            {
+                _cpuCurvePoints = args.CpuPoints;
+                _gpuCurvePoints = args.GpuPoints;
+
+                int cpuSpeed = _fanCurveForm!.InterpolateCpuSpeed(_cpuTemp);
+                int gpuSpeed = _fanCurveForm!.InterpolateGpuSpeed(_gpuTemp);
+
+                bool cpuOk = _wmi.SetCpuFanSpeed((byte)cpuSpeed);
+                bool gpuOk = _wmi.SetGpuFanSpeed((byte)gpuSpeed);
+
+                args.Success = cpuOk && gpuOk;
+
+                if (args.Success)
+                {
+                    _fanCurveEnabled = true;
+                    _lastCurveCpuSpeed = cpuSpeed;
+                    _lastCurveGpuSpeed = gpuSpeed;
+
+                    _cpuFanSlider.Value = Math.Clamp(cpuSpeed, 10, 100);
+                    _gpuFanSlider.Value = Math.Clamp(gpuSpeed, 10, 100);
+                    _lblCpuFanSpeedHdr.Text = $"CPU FAN: {cpuSpeed}%";
+                    _lblGpuFanSpeedHdr.Text = $"GPU FAN: {gpuSpeed}%";
+
+                    SaveCurveToRegistry("CpuCurve", _cpuCurvePoints);
+                    SaveCurveToRegistry("GpuCurve", _gpuCurvePoints);
+                    SaveState("FanCurveEnabled", 1);
+                }
+            };
+
+            _fanCurveForm.FormClosed += (s, e) => _fanCurveForm = null;
+            _fanCurveForm.Show(this);
+        }
+
+        private void SaveCurveToRegistry(string name, List<Point> points)
+        {
+            try
+            {
+                using var key = Registry.CurrentUser.CreateSubKey(@"SOFTWARE\PredatorControl");
+                string data = string.Join(";", points.Select(p => $"{p.X},{p.Y}"));
+                key.SetValue(name, data);
+            }
+            catch { }
+        }
+
+        private List<Point>? LoadCurveFromRegistry(string name)
+        {
+            try
+            {
+                using var key = Registry.CurrentUser.CreateSubKey(@"SOFTWARE\PredatorControl");
+                string? data = key.GetValue(name) as string;
+                if (string.IsNullOrEmpty(data)) return null;
+
+                var pts = new List<Point>();
+                foreach (var pair in data.Split(';'))
+                {
+                    var parts = pair.Split(',');
+                    if (parts.Length == 2 && int.TryParse(parts[0], out int x) && int.TryParse(parts[1], out int y))
+                        pts.Add(new Point(x, y));
+                }
+                return pts.Count >= 2 ? pts : null;
+            }
+            catch { return null; }
         }
 
         private void ApplyDisplayMode(int hz, PredatorButton btn)
@@ -872,6 +1066,9 @@ namespace PredatorControlApp
                 };
                 ApplyPowerMode(powerMode, powerBtn);
 
+                int savedFanSpeedCpu = Math.Clamp((int)key.GetValue("FanSpeedCpu", 50), 10, 100);
+                int savedFanSpeedGpu = Math.Clamp((int)key.GetValue("FanSpeedGpu", 50), 10, 100);
+
                 var (fanMode, fanBtn) = savedFan switch
                 {
                     0x02 => ((byte)0x02, _btnMaxFan),
@@ -879,6 +1076,24 @@ namespace PredatorControlApp
                     _ => ((byte)0x01, _btnAutoFan)
                 };
                 ApplyFanMode(fanMode, fanBtn);
+
+                if (fanMode == 0x03)
+                {
+                    _cpuFanSlider.Value = savedFanSpeedCpu;
+                    _gpuFanSlider.Value = savedFanSpeedGpu;
+                    _lblCpuFanSpeedHdr.Text = $"CPU FAN: {savedFanSpeedCpu}%";
+                    _lblGpuFanSpeedHdr.Text = $"GPU FAN: {savedFanSpeedGpu}%";
+                    _wmi.SetFanSpeed((byte)savedFanSpeedCpu, (byte)savedFanSpeedGpu);
+                }
+
+                var loadedCpu = LoadCurveFromRegistry("CpuCurve");
+                var loadedGpu = LoadCurveFromRegistry("GpuCurve");
+                if (loadedCpu != null) _cpuCurvePoints = loadedCpu;
+                if (loadedGpu != null) _gpuCurvePoints = loadedGpu;
+
+                int savedCurveEnabled = (int)key.GetValue("FanCurveEnabled", 0);
+                if (savedCurveEnabled == 1 && fanMode == 0x03)
+                    _fanCurveEnabled = true;
 
                 int clampedMode = Math.Clamp(savedRgbMode, 0, 7);
                 if (clampedMode == 0)
@@ -955,6 +1170,58 @@ namespace PredatorControlApp
             _lblGpuTemp.ForeColor = TempColor(_gpuTemp);
 
             _trayIcon.Text = $"Predator Control\nCPU: {(_cpuTemp > 0 ? $"{_cpuTemp}°C" : "N/A")}  GPU: {(_gpuTemp > 0 ? $"{_gpuTemp}°C" : "N/A")}";
+
+            if (_fanCurveForm != null && !_fanCurveForm.IsDisposed)
+                _fanCurveForm.UpdateTemps(_cpuTemp, _gpuTemp);
+
+            ApplyFanCurve();
+        }
+
+        private void ApplyFanCurve()
+        {
+            if (!_fanCurveEnabled) return;
+            if (GetCurrentFanByte() != 0x03) return;  
+            if (_cpuTemp <= 0 && _gpuTemp <= 0) return; 
+
+            int cpuSpeed = InterpolateCurve(_cpuCurvePoints, _cpuTemp);
+            int gpuSpeed = InterpolateCurve(_gpuCurvePoints, _gpuTemp);
+
+            if (cpuSpeed != _lastCurveCpuSpeed)
+            {
+                _wmi.SetCpuFanSpeed((byte)cpuSpeed);
+                _lastCurveCpuSpeed = cpuSpeed;
+
+                _cpuFanSlider.Value = Math.Clamp(cpuSpeed, 10, 100);
+                _lblCpuFanSpeedHdr.Text = $"CPU FAN: {cpuSpeed}%";
+            }
+
+            if (gpuSpeed != _lastCurveGpuSpeed)
+            {
+                _wmi.SetGpuFanSpeed((byte)gpuSpeed);
+                _lastCurveGpuSpeed = gpuSpeed;
+
+                _gpuFanSlider.Value = Math.Clamp(gpuSpeed, 10, 100);
+                _lblGpuFanSpeedHdr.Text = $"GPU FAN: {gpuSpeed}%";
+            }
+        }
+
+        private static int InterpolateCurve(List<Point> curve, int temp)
+        {
+            if (curve.Count == 0) return 50;
+            if (temp <= curve[0].X) return curve[0].Y;
+            if (temp >= curve[^1].X) return curve[^1].Y;
+
+            for (int i = 0; i < curve.Count - 1; i++)
+            {
+                if (temp >= curve[i].X && temp <= curve[i + 1].X)
+                {
+                    float span = curve[i + 1].X - curve[i].X;
+                    if (span == 0) return curve[i].Y;
+                    float t = (temp - curve[i].X) / span;
+                    return (int)Math.Round(curve[i].Y + t * (curve[i + 1].Y - curve[i].Y));
+                }
+            }
+            return curve[^1].Y;
         }
 
         private void ApplyPowerRules(bool pluggedIn)

@@ -23,6 +23,9 @@ namespace PredatorControlApp
         private byte _direction = 0;   
         private int _lastMode = 3;     
 
+        private byte _customCpuFanSpeed = 50;
+        private byte _customGpuFanSpeed = 50;
+
         public byte LastR => _lastR;
         public byte LastG => _lastG;
         public byte LastB => _lastB;
@@ -30,6 +33,8 @@ namespace PredatorControlApp
         public byte Speed => _speed;
         public byte Direction => _direction;
         public int LastRgbMode => _lastMode;
+        public byte CustomCpuFanSpeed => _customCpuFanSpeed;
+        public byte CustomGpuFanSpeed => _customGpuFanSpeed;
 
         private ManagementObject? GetWmiObject()
         {
@@ -114,8 +119,37 @@ namespace PredatorControlApp
             SyncWindowsPowerMode(mode);
         }
 
-        public void SetFanBehavior(byte mode) =>
+        public void SetFanBehavior(byte mode)
+        {
             SendCommand("SetGamingFanBehavior", (ulong)(0x09 | ((ulong)mode << 16) | ((ulong)mode << 22)));
+
+            if (mode == 0x03)
+                SetFanSpeed(_customCpuFanSpeed, _customGpuFanSpeed);
+        }
+
+        public bool SetFanSpeed(byte cpuSpeed, byte gpuSpeed)
+        {
+            _customCpuFanSpeed = cpuSpeed;
+            _customGpuFanSpeed = gpuSpeed;
+
+            var (cpuOk, _) = SendCommand("SetGamingFanSpeed", 0x01UL | ((ulong)cpuSpeed << 8));
+            var (gpuOk, _) = SendCommand("SetGamingFanSpeed", 0x04UL | ((ulong)gpuSpeed << 8));
+            return cpuOk && gpuOk;
+        }
+
+        public bool SetCpuFanSpeed(byte speed)
+        {
+            _customCpuFanSpeed = speed;
+            var (ok, _) = SendCommand("SetGamingFanSpeed", 0x01UL | ((ulong)speed << 8));
+            return ok;
+        }
+
+        public bool SetGpuFanSpeed(byte speed)
+        {
+            _customGpuFanSpeed = speed;
+            var (ok, _) = SendCommand("SetGamingFanSpeed", 0x04UL | ((ulong)speed << 8));
+            return ok;
+        }
 
         public void SetRgbMode(int mode, byte r, byte g, byte b, byte brightness, byte speed, byte direction)
         {
