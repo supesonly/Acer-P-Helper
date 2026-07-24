@@ -34,7 +34,9 @@ namespace PredatorControlApp
         private PredatorDropDown _cboPower = null!, _cboFan = null!, _cboRefresh = null!;
         private PredatorDropDown _cboBattery = null!, _cboRgbMode = null!;
         private PredatorSlider _trkBrightness = null!, _trkSpeed = null!;
+        private PredatorSlider _trkCpuFan = null!, _trkGpuFan = null!;
         private Label _lblBrightVal = null!, _lblSpeedVal = null!;
+        private Label _lblCpuFanHdr = null!, _lblGpuFanHdr = null!;
         private PredatorButton _btnColorPick = null!;
         private Color _selectedColor = Color.FromArgb(0, 200, 160);
         private ColorDialog _colorPicker = new() { FullOpen = true };
@@ -62,7 +64,7 @@ namespace PredatorControlApp
             this.StartPosition = FormStartPosition.CenterParent;
             this.BackColor = FormBg;
             this.ForeColor = TextColor;
-            this.ClientSize = new Size(780, 700);
+            this.ClientSize = new Size(780, 800);
             this.DoubleBuffered = true;
             this.ShowInTaskbar = false;
             try { this.Icon = new Icon("appicon.ico"); } catch { }
@@ -183,6 +185,41 @@ namespace PredatorControlApp
             ey += 24;
             _cboFan = MakeComboIn(_pnlEditor, FanModeNames, 0, ey, editorW);
             ey += sectionGap;
+
+            int sliderW = (editorW - 12) / 2;
+            _lblCpuFanHdr = MakeLabelIn(_pnlEditor, "CPU FAN: 50%", 0, ey, FontSection, HeaderColor);
+            _lblGpuFanHdr = MakeLabelIn(_pnlEditor, "GPU FAN: 50%", sliderW + 12, ey, FontSection, HeaderColor);
+            ey += 22;
+            _trkCpuFan = new PredatorSlider
+            {
+                Location = new Point(0, ey),
+                Size = new Size(sliderW, 28),
+                Minimum = 10, Maximum = 100, Value = 50
+            };
+            _trkGpuFan = new PredatorSlider
+            {
+                Location = new Point(sliderW + 12, ey),
+                Size = new Size(sliderW, 28),
+                Minimum = 10, Maximum = 100, Value = 50
+            };
+            _pnlEditor.Controls.Add(_trkCpuFan);
+            _pnlEditor.Controls.Add(_trkGpuFan);
+            _trkCpuFan.ValueChanged += (s, e) => _lblCpuFanHdr.Text = $"CPU FAN: {_trkCpuFan.Value}%";
+            _trkGpuFan.ValueChanged += (s, e) => _lblGpuFanHdr.Text = $"GPU FAN: {_trkGpuFan.Value}%";
+            ey += sectionGap;
+
+            _lblCpuFanHdr.Visible = false;
+            _lblGpuFanHdr.Visible = false;
+            _trkCpuFan.Visible = false;
+            _trkGpuFan.Visible = false;
+            _cboFan.SelectedIndexChanged += (s, e) =>
+            {
+                bool isCustom = _cboFan.SelectedIndex == 2; 
+                _lblCpuFanHdr.Visible = isCustom;
+                _lblGpuFanHdr.Visible = isCustom;
+                _trkCpuFan.Visible = isCustom;
+                _trkGpuFan.Visible = isCustom;
+            };
 
             MakeLabelIn(_pnlEditor, "REFRESH RATE", 0, ey, FontSection, HeaderColor);
             ey += 24;
@@ -369,6 +406,16 @@ namespace PredatorControlApp
             int fanIdx = Array.IndexOf(FanModeValues, p.FanMode);
             _cboFan.SelectedIndex = fanIdx >= 0 ? fanIdx : 0;
 
+            bool isCustomFan = p.FanMode == 0x03;
+            _trkCpuFan.Value = p.CpuFanSpeed >= 10 ? Math.Clamp(p.CpuFanSpeed, 10, 100) : 50;
+            _trkGpuFan.Value = p.GpuFanSpeed >= 10 ? Math.Clamp(p.GpuFanSpeed, 10, 100) : 50;
+            _lblCpuFanHdr.Text = $"CPU FAN: {_trkCpuFan.Value}%";
+            _lblGpuFanHdr.Text = $"GPU FAN: {_trkGpuFan.Value}%";
+            _lblCpuFanHdr.Visible = isCustomFan;
+            _lblGpuFanHdr.Visible = isCustomFan;
+            _trkCpuFan.Visible = isCustomFan;
+            _trkGpuFan.Visible = isCustomFan;
+
             if (p.RefreshRate == -1) _cboRefresh.SelectedIndex = 0;
             else if (p.RefreshRate <= 60) _cboRefresh.SelectedIndex = 1;
             else _cboRefresh.SelectedIndex = 2;
@@ -398,6 +445,8 @@ namespace PredatorControlApp
                 DisplayName = _editingProfile?.DisplayName ?? "",
                 PowerMode = PowerModeValues[_cboPower.SelectedIndex],
                 FanMode = FanModeValues[_cboFan.SelectedIndex],
+                CpuFanSpeed = _cboFan.SelectedIndex == 2 ? _trkCpuFan.Value : -1,
+                GpuFanSpeed = _cboFan.SelectedIndex == 2 ? _trkGpuFan.Value : -1,
             };
 
             p.RefreshRate = _cboRefresh.SelectedIndex switch

@@ -7,6 +7,8 @@ namespace PredatorControlApp
 
         public byte PowerMode { get; set; } = 0x01;      
         public byte FanMode { get; set; } = 0x01;         
+        public int CpuFanSpeed { get; set; } = -1;         
+        public int GpuFanSpeed { get; set; } = -1;
 
         public int RefreshRate { get; set; } = -1;        
 
@@ -24,6 +26,9 @@ namespace PredatorControlApp
     {
         public byte PowerMode { get; set; }
         public byte FanMode { get; set; }
+        public int CpuFanSpeed { get; set; }
+        public int GpuFanSpeed { get; set; }
+        public bool FanCurveWasEnabled { get; set; }
         public int RefreshRate { get; set; }
         public int BatteryLimit { get; set; }
         public int RgbMode { get; set; }

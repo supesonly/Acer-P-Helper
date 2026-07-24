@@ -15,3 +15,10 @@ obj/
 # OS
 Thumbs.db
 .DS_Store
+
+# Publish & Temp
+publish/
+*.ps1
+*.txt
+*.tex
+

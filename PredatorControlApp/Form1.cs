@@ -43,6 +43,19 @@ namespace PredatorControlApp
 
         #endregion
 
+        #region Win32 Interop — Dark Scrollbar
+
+        [DllImport("dwmapi.dll")]
+        private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
+
+        [DllImport("user32.dll")]
+        private static extern bool ShowScrollBar(IntPtr hWnd, int wBar, bool bShow);
+
+        private const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
+        private const int SB_VERT = 1;
+
+        #endregion
+
         #region Win32 Interop — Display Control
 
         [DllImport("user32.dll")]
@@ -80,6 +93,7 @@ namespace PredatorControlApp
         private ColorDialog _colorPicker = new() { FullOpen = true };
 
         private int _cpuTemp, _gpuTemp;
+        private DarkScrollPanel _contentPanel = null!;
 
         private bool? _isPluggedIn = SystemInformation.PowerStatus.PowerLineStatus == PowerLineStatus.Online;
         private bool _isClosing;
@@ -128,6 +142,11 @@ namespace PredatorControlApp
         private PredatorButton? _activePowerBtn, _activeFanBtn, _activeDisplayBtn;
         private bool _isUpdatingBattery;
 
+        private PredatorDropDown _cboAcProfile = null!, _cboBatteryProfile = null!;
+        private Label _lblAcProfileHdr = null!, _lblBatteryProfileHdr = null!;
+        private static readonly string[] PowerProfileNames = { "Don't Change", "Quiet", "Balanced", "Performance", "Turbo", "Eco" };
+        private static readonly byte[] PowerProfileValues = { 0xFF, 0x00, 0x01, 0x04, 0x05, 0x06 };
+
         private PredatorSwitch _switchBatteryLimit = null!;
         private Label _lblBatteryStatus = null!;
 
@@ -137,6 +156,9 @@ namespace PredatorControlApp
         private Label _lblGameSyncStatus = null!;
         private PredatorButton _btnConfigureGames = null!;
         private bool _isGameSyncOverriding;
+
+        private PredatorToggle _switchStartWithWindows = null!;
+        private Label _lblStartupStatus = null!;
 
         private static readonly string[] RgbModeNames = { "Static", "Breathing", "Neon", "Wave", "Shifting", "Zoom", "Meteor", "Twinkling" };
 
@@ -328,7 +350,7 @@ namespace PredatorControlApp
             this.ForeColor = Color.White;
 
             _formW = S(450);
-            this.ClientSize = new Size(_formW, S(948));
+            this.ClientSize = new Size(_formW, Math.Min(S(960), Screen.PrimaryScreen!.WorkingArea.Height - 40));
             this.FormBorderStyle = FormBorderStyle.None;
             this.StartPosition = FormStartPosition.CenterScreen;
             try { this.Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { }
@@ -360,7 +382,19 @@ namespace PredatorControlApp
             pnlTitle.Controls.Add(lblClose);
             pnlTitle.Controls.Add(lblMin);
 
-            y = pnlTitle.Bottom + S(24);
+            y = pnlTitle.Bottom;
+
+            _contentPanel = new DarkScrollPanel
+            {
+                Location = new Point(0, y),
+                Size = new Size(_formW, this.ClientSize.Height - y),
+                BackColor = FormBg
+            };
+            _contentPanel.SetDpiScale(_dpiScale);
+            this.Controls.Add(_contentPanel);
+            _contentPanel.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+
+            y = S(24); 
 
             MakeLabel("CPU:", pad, y, FontBody, SubHeaderColor);
             _lblCpuTemp = MakeLabel("43°C", pad + S(34), y, FontBodyBold, Color.White);
@@ -395,7 +429,26 @@ namespace PredatorControlApp
             _btnTurbo.Click += (s, e) => ApplyPowerMode(0x05, _btnTurbo);
             _btnEco.Click += (s, e) => ApplyPowerMode(0x06, _btnEco);
 
-            y += btnH + S(28);
+            y += btnH + S(14);
+            int profileDropW = (contentW - gap) / 2;
+            _lblAcProfileHdr = MakeLabel("ON AC POWER:", pad, y, FontSectionHeader, SubHeaderColor);
+            _lblBatteryProfileHdr = MakeLabel("ON BATTERY:", pad + profileDropW + gap, y, FontSectionHeader, SubHeaderColor);
+
+            y += S(20);
+            _cboAcProfile = new PredatorDropDown { Location = new Point(pad, y), Size = new Size(profileDropW, S(30)) };
+            _cboAcProfile.Items.AddRange(new[] { "Don't Change", "Quiet", "Balanced", "Perf", "Turbo" });
+            _cboAcProfile.SelectedIndex = 0;
+            _contentPanel.Controls.Add(_cboAcProfile);
+
+            _cboBatteryProfile = new PredatorDropDown { Location = new Point(pad + profileDropW + gap, y), Size = new Size(profileDropW, S(30)) };
+            _cboBatteryProfile.Items.AddRange(new[] { "Don't Change", "Quiet", "Balanced", "Eco" });
+            _cboBatteryProfile.SelectedIndex = 0;
+            _contentPanel.Controls.Add(_cboBatteryProfile);
+
+            _cboAcProfile.SelectedIndexChanged += (s, e) => SaveState("AutoPowerAC", _cboAcProfile.SelectedIndex);
+            _cboBatteryProfile.SelectedIndexChanged += (s, e) => SaveState("AutoPowerBattery", _cboBatteryProfile.SelectedIndex);
+
+            y += S(30) + S(20);
             MakeSectionHeader("FAN CONTROL", pad, y);
             
             y += S(24);
@@ -430,8 +483,8 @@ namespace PredatorControlApp
                 Minimum  = 10, Maximum = 100, Value = 50,
                 Visible  = false
             };
-            this.Controls.Add(_cpuFanSlider);
-            this.Controls.Add(_gpuFanSlider);
+            _contentPanel.Controls.Add(_cpuFanSlider);
+            _contentPanel.Controls.Add(_gpuFanSlider);
 
             _cpuFanSlider.ValueChanged   += (s, e) => _lblCpuFanSpeedHdr.Text = $"CPU FAN: {_cpuFanSlider.Value}%";
             _gpuFanSlider.ValueChanged   += (s, e) => _lblGpuFanSpeedHdr.Text = $"GPU FAN: {_gpuFanSlider.Value}%";
@@ -461,6 +514,9 @@ namespace PredatorControlApp
                 _lastCurveGpuSpeed = -1;
                 HighlightBtn(_btnFixedSpeed, ref _activeCustomSubBtn);
                 SaveState("FanCurveEnabled", 0);
+
+                if (_fanCurveForm != null && !_fanCurveForm.IsDisposed)
+                    _fanCurveForm.Close();
 
                 _cpuFanSlider.Enabled = true;
                 _gpuFanSlider.Enabled = true;
@@ -500,14 +556,31 @@ namespace PredatorControlApp
 
             _switchBatteryLimit = new PredatorSwitch
             {
-                Location = new Point(_formW - pad - S(60), y),
-                Size = new Size(S(60), switchH)
+                Location = new Point(_formW - pad - S(48), y),
+                Size = new Size(S(48), switchH)
             };
-            this.Controls.Add(_switchBatteryLimit);
+            _contentPanel.Controls.Add(_switchBatteryLimit);
 
             _switchBatteryLimit.CheckedChanged += (s, e) =>
             {
                 ApplyBatteryLimit(_switchBatteryLimit.Checked);
+            };
+
+            y += switchH + S(12);
+            _lblStartupStatus = MakeLabel("Start with Windows", pad, y, FontBody, SubHeaderColor);
+            CenterV(_lblStartupStatus, y, switchH);
+
+            _switchStartWithWindows = new PredatorToggle
+            {
+                Location = new Point(_formW - pad - S(48), y),
+                Size = new Size(S(48), switchH),
+                Checked = IsStartupEnabled()
+            };
+            _contentPanel.Controls.Add(_switchStartWithWindows);
+
+            _switchStartWithWindows.CheckedChanged += (s, e) =>
+            {
+                SetStartupEnabled(_switchStartWithWindows.Checked);
             };
 
             y += switchH + S(28);
@@ -518,7 +591,7 @@ namespace PredatorControlApp
             _rgbDropDown = new PredatorDropDown { Location = new Point(pad, y), Size = new Size(contentW, dropH) };
             foreach (var name in RgbModeNames) _rgbDropDown.Items.Add(name);
             _rgbDropDown.SelectedIndex = 3; 
-            this.Controls.Add(_rgbDropDown);
+            _contentPanel.Controls.Add(_rgbDropDown);
 
             y += dropH + S(28);
             _lblBrightHdr = MakeLabel("BRIGHTNESS: 100%", pad, y, FontSectionHeader, SubHeaderColor);
@@ -527,10 +600,10 @@ namespace PredatorControlApp
             y += S(24);
             int sliderW = (contentW - gap * 4) / 2;
             _brightnessSlider = new PredatorSlider { Location = new Point(pad, y), Size = new Size(sliderW, S(28)), Minimum = 0, Maximum = 100, Value = 100 };
-            this.Controls.Add(_brightnessSlider);
+            _contentPanel.Controls.Add(_brightnessSlider);
             
             _speedSlider = new PredatorSlider { Location = new Point(_formW / 2 + S(10), y), Size = new Size(sliderW, S(28)), Minimum = 1, Maximum = 100, Value = 50 };
-            this.Controls.Add(_speedSlider);
+            _contentPanel.Controls.Add(_speedSlider);
 
             _brightnessSlider.ValueChanged += (s, e) => { _lblBrightHdr.Text = $"BRIGHTNESS: {_brightnessSlider.Value}%"; };
             _brightnessSlider.ValueCommitted += (s, e) => { _wmi.SetBrightness((byte)_brightnessSlider.Value); SaveState("Brightness", _brightnessSlider.Value); };
@@ -599,7 +672,7 @@ namespace PredatorControlApp
                 Location = new Point(_formW - pad - S(48), y),
                 Size = new Size(S(48), syncSwitchH)
             };
-            this.Controls.Add(_switchGameSync);
+            _contentPanel.Controls.Add(_switchGameSync);
 
             _switchGameSync.CheckedChanged += (s, e) =>
             {
@@ -634,21 +707,21 @@ namespace PredatorControlApp
             {
                 Text = text, Location = new Point(x, y), AutoSize = true, Font = font, ForeColor = color, BackColor = Color.Transparent
             };
-            this.Controls.Add(lbl);
+            _contentPanel.Controls.Add(lbl);
             return lbl;
         }
 
         private PredatorButton MakeButton(string text, int x, int y, int width, int height)
         {
             var btn = new PredatorButton { Text = text, Location = new Point(x, y), Size = new Size(width, height) };
-            this.Controls.Add(btn);
+            _contentPanel.Controls.Add(btn);
             return btn;
         }
 
         private void AddSeparator(int y)
         {
             int pad = S(24);
-            this.Controls.Add(new Panel { Location = new Point(pad, y), Size = new Size(_formW - pad * 2, 1), BackColor = SeparatorColor });
+            _contentPanel.Controls.Add(new Panel { Location = new Point(pad, y), Size = new Size(_formW - pad * 2, 1), BackColor = SeparatorColor });
         }
 
         private void CenterV(Label lbl, int controlY, int controlH)
@@ -896,6 +969,9 @@ namespace PredatorControlApp
             {
                 PowerMode = GetCurrentPowerByte(),
                 FanMode = GetCurrentFanByte(),
+                CpuFanSpeed = _cpuFanSlider.Value,
+                GpuFanSpeed = _gpuFanSlider.Value,
+                FanCurveWasEnabled = _fanCurveEnabled,
                 RefreshRate = GetCurrentRefreshRate(),
                 BatteryLimit = _switchBatteryLimit.Checked ? 1 : 0,
                 RgbMode = _rgbDropDown.SelectedIndex,
@@ -951,6 +1027,29 @@ namespace PredatorControlApp
             ApplyPowerMode(profile.PowerMode, PowerByteToBtn(profile.PowerMode));
             ApplyFanMode(profile.FanMode, FanByteToBtn(profile.FanMode));
 
+            if (profile.FanMode == 0x03)
+            {
+                _fanCurveEnabled = false;
+                HighlightBtn(_btnFixedSpeed, ref _activeCustomSubBtn);
+                _cpuFanSlider.Enabled = true;
+                _gpuFanSlider.Enabled = true;
+
+                if (profile.CpuFanSpeed >= 10)
+                {
+                    int cpuSpeed = Math.Clamp(profile.CpuFanSpeed, 10, 100);
+                    _wmi.SetCpuFanSpeed((byte)cpuSpeed);
+                    _cpuFanSlider.Value = cpuSpeed;
+                    _lblCpuFanSpeedHdr.Text = $"CPU FAN: {cpuSpeed}%";
+                }
+                if (profile.GpuFanSpeed >= 10)
+                {
+                    int gpuSpeed = Math.Clamp(profile.GpuFanSpeed, 10, 100);
+                    _wmi.SetGpuFanSpeed((byte)gpuSpeed);
+                    _gpuFanSlider.Value = gpuSpeed;
+                    _lblGpuFanSpeedHdr.Text = $"GPU FAN: {gpuSpeed}%";
+                }
+            }
+
             if (profile.RefreshRate >= 0)
             {
                 int hz = profile.RefreshRate;
@@ -997,6 +1096,32 @@ namespace PredatorControlApp
 
             ApplyPowerMode(snap.PowerMode, PowerByteToBtn(snap.PowerMode));
             ApplyFanMode(snap.FanMode, FanByteToBtn(snap.FanMode));
+
+            if (snap.FanMode == 0x03)
+            {
+                if (snap.FanCurveWasEnabled)
+                {
+                    _fanCurveEnabled = true;
+                    HighlightBtn(_btnFanCurve, ref _activeCustomSubBtn);
+                    _cpuFanSlider.Enabled = false;
+                    _gpuFanSlider.Enabled = false;
+                }
+                else
+                {
+                    _fanCurveEnabled = false;
+                    HighlightBtn(_btnFixedSpeed, ref _activeCustomSubBtn);
+                    _cpuFanSlider.Enabled = true;
+                    _gpuFanSlider.Enabled = true;
+                    int cpuSpeed = Math.Clamp(snap.CpuFanSpeed, 10, 100);
+                    int gpuSpeed = Math.Clamp(snap.GpuFanSpeed, 10, 100);
+                    _wmi.SetCpuFanSpeed((byte)cpuSpeed);
+                    _wmi.SetGpuFanSpeed((byte)gpuSpeed);
+                    _cpuFanSlider.Value = cpuSpeed;
+                    _gpuFanSlider.Value = gpuSpeed;
+                    _lblCpuFanSpeedHdr.Text = $"CPU FAN: {cpuSpeed}%";
+                    _lblGpuFanSpeedHdr.Text = $"GPU FAN: {gpuSpeed}%";
+                }
+            }
 
             SetRefreshRate(snap.RefreshRate);
             HighlightBtn(snap.RefreshRate <= 60 ? _btn60Hz : _btnMaxHz, ref _activeDisplayBtn);
@@ -1066,6 +1191,11 @@ namespace PredatorControlApp
                 };
                 ApplyPowerMode(powerMode, powerBtn);
 
+                int savedAcProfile = Math.Clamp((int)key.GetValue("AutoPowerAC", 0), 0, _cboAcProfile.Items.Count - 1);
+                int savedBatProfile = Math.Clamp((int)key.GetValue("AutoPowerBattery", 0), 0, _cboBatteryProfile.Items.Count - 1);
+                _cboAcProfile.SelectedIndex = savedAcProfile;
+                _cboBatteryProfile.SelectedIndex = savedBatProfile;
+
                 int savedFanSpeedCpu = Math.Clamp((int)key.GetValue("FanSpeedCpu", 50), 10, 100);
                 int savedFanSpeedGpu = Math.Clamp((int)key.GetValue("FanSpeedGpu", 50), 10, 100);
 
@@ -1075,16 +1205,6 @@ namespace PredatorControlApp
                     0x03 => ((byte)0x03, _btnCustomFan),
                     _ => ((byte)0x01, _btnAutoFan)
                 };
-                ApplyFanMode(fanMode, fanBtn);
-
-                if (fanMode == 0x03)
-                {
-                    _cpuFanSlider.Value = savedFanSpeedCpu;
-                    _gpuFanSlider.Value = savedFanSpeedGpu;
-                    _lblCpuFanSpeedHdr.Text = $"CPU FAN: {savedFanSpeedCpu}%";
-                    _lblGpuFanSpeedHdr.Text = $"GPU FAN: {savedFanSpeedGpu}%";
-                    _wmi.SetFanSpeed((byte)savedFanSpeedCpu, (byte)savedFanSpeedGpu);
-                }
 
                 var loadedCpu = LoadCurveFromRegistry("CpuCurve");
                 var loadedGpu = LoadCurveFromRegistry("GpuCurve");
@@ -1094,6 +1214,33 @@ namespace PredatorControlApp
                 int savedCurveEnabled = (int)key.GetValue("FanCurveEnabled", 0);
                 if (savedCurveEnabled == 1 && fanMode == 0x03)
                     _fanCurveEnabled = true;
+
+                ApplyFanMode(fanMode, fanBtn);
+
+                if (fanMode == 0x03)
+                {
+                    if (_fanCurveEnabled)
+                    {
+                        int cpuSpeed = InterpolateCurve(_cpuCurvePoints, _cpuTemp);
+                        int gpuSpeed = InterpolateCurve(_gpuCurvePoints, _gpuTemp);
+                        _wmi.SetCpuFanSpeed((byte)cpuSpeed);
+                        _wmi.SetGpuFanSpeed((byte)gpuSpeed);
+                        _lastCurveCpuSpeed = cpuSpeed;
+                        _lastCurveGpuSpeed = gpuSpeed;
+                        _cpuFanSlider.Value = Math.Clamp(cpuSpeed, 10, 100);
+                        _gpuFanSlider.Value = Math.Clamp(gpuSpeed, 10, 100);
+                        _lblCpuFanSpeedHdr.Text = $"CPU FAN: {cpuSpeed}%";
+                        _lblGpuFanSpeedHdr.Text = $"GPU FAN: {gpuSpeed}%";
+                    }
+                    else
+                    {
+                        _cpuFanSlider.Value = savedFanSpeedCpu;
+                        _gpuFanSlider.Value = savedFanSpeedGpu;
+                        _lblCpuFanSpeedHdr.Text = $"CPU FAN: {savedFanSpeedCpu}%";
+                        _lblGpuFanSpeedHdr.Text = $"GPU FAN: {savedFanSpeedGpu}%";
+                        _wmi.SetFanSpeed((byte)savedFanSpeedCpu, (byte)savedFanSpeedGpu);
+                    }
+                }
 
                 int clampedMode = Math.Clamp(savedRgbMode, 0, 7);
                 if (clampedMode == 0)
@@ -1162,7 +1309,15 @@ namespace PredatorControlApp
             }
 
             _cpuTemp = _wmi.CpuTemp;
-            _gpuTemp = _wmi.GpuTemp;
+
+            if (_isPluggedIn == true)
+            {
+                _gpuTemp = _wmi.GpuTemp;
+            }
+            else
+            {
+                _gpuTemp = 0; 
+            }
 
             _lblCpuTemp.Text = _cpuTemp > 0 ? $"{_cpuTemp}°C" : "--°C";
             _lblGpuTemp.Text = _gpuTemp > 0 ? $"{_gpuTemp}°C" : "--°C";
@@ -1235,8 +1390,16 @@ namespace PredatorControlApp
                 _trayPowerTurbo.Enabled = true;
                 _trayPowerEco.Enabled = false;
 
-                if (_activePowerBtn == _btnEco)
+                int acIdx = _cboAcProfile.SelectedIndex;
+                if (acIdx > 0)
+                {
+                    byte mode = PowerProfileValues[acIdx];
+                    ApplyPowerMode(mode, PowerByteToBtn(mode));
+                }
+                else if (_activePowerBtn == _btnEco)
+                {
                     ApplyPowerMode(0x01, _btnBalanced);
+                }
             }
             else
             {
@@ -1247,7 +1410,16 @@ namespace PredatorControlApp
                 _trayPowerTurbo.Enabled = false;
                 _trayPowerEco.Enabled = true;
 
-                ApplyPowerMode(0x06, _btnEco);
+                int batIdx = _cboBatteryProfile.SelectedIndex;
+                if (batIdx > 0)
+                {
+                    byte mode = PowerProfileValues[batIdx];
+                    ApplyPowerMode(mode, PowerByteToBtn(mode));
+                }
+                else if (_activePowerBtn == _btnPerform || _activePowerBtn == _btnTurbo)
+                {
+                    ApplyPowerMode(0x01, _btnBalanced);
+                }
             }
         }
 
@@ -1303,6 +1475,36 @@ namespace PredatorControlApp
                 _appMutex.Dispose();
                 base.OnFormClosing(e);
             }
+        }
+
+        private static bool IsStartupEnabled()
+        {
+            try
+            {
+                using var key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", false);
+                return key?.GetValue("PredatorControl") != null;
+            }
+            catch { return false; }
+        }
+
+        private static void SetStartupEnabled(bool enable)
+        {
+            try
+            {
+                using var key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", true);
+                if (key == null) return;
+
+                if (enable)
+                {
+                    string exePath = Application.ExecutablePath;
+                    key.SetValue("PredatorControl", $"\"{exePath}\" -hidden");
+                }
+                else
+                {
+                    key.DeleteValue("PredatorControl", false);
+                }
+            }
+            catch { }
         }
 
         #endregion
