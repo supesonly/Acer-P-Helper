@@ -75,9 +75,23 @@ namespace PredatorControlApp
             get => _points;
             set
             {
-                _points = value ?? new List<Point>(_defaultPoints);
+                _points = Normalize(value);
                 Invalidate();
             }
+        }
+
+        public static List<Point> Normalize(List<Point>? src)
+        {
+            if (src == null || src.Count < 2) return new List<Point>(_defaultPoints);
+
+            var pts = src
+                .Select(p => new Point(Math.Clamp(p.X, TempMin, TempMax), Math.Clamp(p.Y, SpeedMin, SpeedMax)))
+                .OrderBy(p => p.X)
+                .ToList();
+
+            pts[0] = new Point(TempMin, pts[0].Y);
+            pts[^1] = new Point(TempMax, pts[^1].Y);
+            return pts;
         }
 
         public List<Point> DefaultPoints => new(_defaultPoints);
@@ -417,7 +431,7 @@ namespace PredatorControlApp
 
                 int lo = _points[_dragIndex - 1].X + MinTempGap;
                 int hi = _points[_dragIndex + 1].X - MinTempGap;
-                temp = Math.Clamp(temp, lo, hi);
+                temp = lo > hi ? (lo + hi) / 2 : Math.Clamp(temp, lo, hi);
             }
 
             var updated = new Point(temp, speed);

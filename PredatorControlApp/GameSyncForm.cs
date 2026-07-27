@@ -67,7 +67,7 @@ namespace PredatorControlApp
             this.ClientSize = new Size(780, 800);
             this.DoubleBuffered = true;
             this.ShowInTaskbar = false;
-            try { this.Icon = new Icon("appicon.ico"); } catch { }
+            try { this.Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { }
 
             BuildUI();
             PopulateList();

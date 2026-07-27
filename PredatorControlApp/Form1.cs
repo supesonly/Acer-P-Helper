@@ -17,7 +17,18 @@ namespace PredatorControlApp
 
         private const int HWND_BROADCAST = 0xffff;
         private static readonly uint WM_SHOWME = RegisterWindowMessage("PREDATOR_CONTROL_SHOW_INSTANCE");
-        private static readonly Mutex _appMutex = new(true, "PredatorControlApp_Unique_System_Mutex_999");
+        private static Mutex? _appMutex;
+
+        private static bool TryTakeSingleInstanceLock()
+        {
+            try
+            {
+                _appMutex = new Mutex(false, "PredatorControlApp_Unique_System_Mutex_999");
+                return _appMutex.WaitOne(TimeSpan.Zero, false);
+            }
+            catch (AbandonedMutexException) { return true; }  
+            catch { return true; }
+        }
 
         #endregion
 
@@ -66,7 +77,13 @@ namespace PredatorControlApp
 
         private const int ENUM_CURRENT_SETTINGS = -1;
         private const int CDS_UPDATEREGISTRY = 0x01;
+        private const int CDS_TEST = 0x02;
+        private const int DISP_CHANGE_SUCCESSFUL = 0;
+        private const int DM_BITSPERPEL = 0x040000;
+        private const int DM_PELSWIDTH = 0x080000;
+        private const int DM_PELSHEIGHT = 0x100000;
         private const int DM_DISPLAYFREQUENCY = 0x400000;
+        private const int DM_INTERLACED = 0x02;
 
         [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
         public struct DEVMODE
@@ -95,7 +112,7 @@ namespace PredatorControlApp
         private int _cpuTemp, _gpuTemp;
         private DarkScrollPanel _contentPanel = null!;
 
-        private bool? _isPluggedIn = SystemInformation.PowerStatus.PowerLineStatus == PowerLineStatus.Online;
+        private bool? _isPluggedIn;
         private bool _isClosing;
         private int _maxHz;
         private float _dpiScale = 1f; 
@@ -144,8 +161,8 @@ namespace PredatorControlApp
 
         private PredatorDropDown _cboAcProfile = null!, _cboBatteryProfile = null!;
         private Label _lblAcProfileHdr = null!, _lblBatteryProfileHdr = null!;
-        private static readonly string[] PowerProfileNames = { "Don't Change", "Quiet", "Balanced", "Performance", "Turbo", "Eco" };
-        private static readonly byte[] PowerProfileValues = { 0xFF, 0x00, 0x01, 0x04, 0x05, 0x06 };
+        internal static readonly byte[] AcProfileValues = { 0xFF, 0x00, 0x01, 0x04, 0x05 };
+        internal static readonly byte[] BatteryProfileValues = { 0xFF, 0x00, 0x01, 0x06 };
 
         private PredatorSwitch _switchBatteryLimit = null!;
         private Label _lblBatteryStatus = null!;
@@ -184,7 +201,7 @@ namespace PredatorControlApp
 
         public Form1()
         {
-            if (!_appMutex.WaitOne(TimeSpan.Zero, true))
+            if (!TryTakeSingleInstanceLock())
             {
                 PostMessage((IntPtr)HWND_BROADCAST, WM_SHOWME, IntPtr.Zero, IntPtr.Zero);
                 Environment.Exit(0);
@@ -200,7 +217,6 @@ namespace PredatorControlApp
             BuildUI();
             BuildTrayMenu();
             SetupSystemTray();
-            RegisterStartup();
 
             if (GetCurrentRefreshRate() <= 60)
             {
@@ -253,25 +269,49 @@ namespace PredatorControlApp
 
         private int GetMaxRefreshRate()
         {
+            DEVMODE cur = new(); cur.dmSize = (short)Marshal.SizeOf(typeof(DEVMODE));
+            if (!EnumDisplaySettings(null, ENUM_CURRENT_SETTINGS, ref cur)) return 60;
+
+            int maxHz = cur.dmDisplayFrequency > 0 ? cur.dmDisplayFrequency : 60;
             DEVMODE dm = new(); dm.dmSize = (short)Marshal.SizeOf(typeof(DEVMODE));
-            int maxHz = 60, modeNum = 0;
-            while (EnumDisplaySettings(null, modeNum, ref dm))
+            for (int modeNum = 0; EnumDisplaySettings(null, modeNum, ref dm); modeNum++)
             {
-                if (dm.dmDisplayFrequency > maxHz) maxHz = dm.dmDisplayFrequency;
-                modeNum++;
+                if (IsSameGeometry(dm, cur) && dm.dmDisplayFrequency > maxHz)
+                    maxHz = dm.dmDisplayFrequency;
+                dm.dmSize = (short)Marshal.SizeOf(typeof(DEVMODE));
             }
             return maxHz;
         }
 
-        private void SetRefreshRate(int hz)
+        private static bool IsSameGeometry(DEVMODE a, DEVMODE b) =>
+            a.dmPelsWidth == b.dmPelsWidth &&
+            a.dmPelsHeight == b.dmPelsHeight &&
+            a.dmBitsPerPel == b.dmBitsPerPel &&
+            (a.dmDisplayFlags & DM_INTERLACED) == 0;
+
+        private bool SetRefreshRate(int hz)
         {
+            if (hz <= 0) return false;
+
+            DEVMODE cur = new(); cur.dmSize = (short)Marshal.SizeOf(typeof(DEVMODE));
+            if (!EnumDisplaySettings(null, ENUM_CURRENT_SETTINGS, ref cur)) return false;
+            if (cur.dmDisplayFrequency == hz) return true;
+
             DEVMODE dm = new(); dm.dmSize = (short)Marshal.SizeOf(typeof(DEVMODE));
-            if (EnumDisplaySettings(null, ENUM_CURRENT_SETTINGS, ref dm))
+            DEVMODE? match = null;
+            for (int modeNum = 0; EnumDisplaySettings(null, modeNum, ref dm); modeNum++)
             {
-                dm.dmDisplayFrequency = hz;
-                dm.dmFields = DM_DISPLAYFREQUENCY;
-                ChangeDisplaySettings(ref dm, CDS_UPDATEREGISTRY);
+                if (IsSameGeometry(dm, cur) && dm.dmDisplayFrequency == hz) { match = dm; break; }
+                dm.dmSize = (short)Marshal.SizeOf(typeof(DEVMODE));
             }
+            if (match == null) return false;
+
+            DEVMODE target = match.Value;
+            target.dmSize = (short)Marshal.SizeOf(typeof(DEVMODE));
+            target.dmFields = DM_BITSPERPEL | DM_PELSWIDTH | DM_PELSHEIGHT | DM_DISPLAYFREQUENCY;
+
+            if (ChangeDisplaySettings(ref target, CDS_TEST) != DISP_CHANGE_SUCCESSFUL) return false;
+            return ChangeDisplaySettings(ref target, CDS_UPDATEREGISTRY) == DISP_CHANGE_SUCCESSFUL;
         }
 
         #endregion
@@ -285,7 +325,7 @@ namespace PredatorControlApp
 
             _trayIcon.ContextMenuStrip = _trayMenu;
             _trayIcon.Text = "Predator Control";
-            _trayIcon.Visible = true;
+            try { _trayIcon.Visible = true; } catch { }
             _trayIcon.DoubleClick += (s, e) => ShowApp();
         }
 
@@ -350,7 +390,8 @@ namespace PredatorControlApp
             this.ForeColor = Color.White;
 
             _formW = S(450);
-            this.ClientSize = new Size(_formW, Math.Min(S(960), Screen.PrimaryScreen!.WorkingArea.Height - 40));
+            int workH = Screen.PrimaryScreen?.WorkingArea.Height ?? S(1000);
+            this.ClientSize = new Size(_formW, Math.Max(S(400), Math.Min(S(960), workH - 40)));
             this.FormBorderStyle = FormBorderStyle.None;
             this.StartPosition = FormStartPosition.CenterScreen;
             try { this.Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { }
@@ -387,12 +428,12 @@ namespace PredatorControlApp
             _contentPanel = new DarkScrollPanel
             {
                 Location = new Point(0, y),
-                Size = new Size(_formW, this.ClientSize.Height - y),
+                Size = new Size(_formW + DarkScrollPanel.NativeBarWidth, this.ClientSize.Height - y),
                 BackColor = FormBg
             };
             _contentPanel.SetDpiScale(_dpiScale);
             this.Controls.Add(_contentPanel);
-            _contentPanel.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+            _contentPanel.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left;
 
             y = S(24); 
 
@@ -445,8 +486,16 @@ namespace PredatorControlApp
             _cboBatteryProfile.SelectedIndex = 0;
             _contentPanel.Controls.Add(_cboBatteryProfile);
 
-            _cboAcProfile.SelectedIndexChanged += (s, e) => SaveState("AutoPowerAC", _cboAcProfile.SelectedIndex);
-            _cboBatteryProfile.SelectedIndexChanged += (s, e) => SaveState("AutoPowerBattery", _cboBatteryProfile.SelectedIndex);
+            _cboAcProfile.SelectedIndexChanged += (s, e) =>
+            {
+                SaveState("AutoPowerAC", _cboAcProfile.SelectedIndex);
+                if (_isPluggedIn == true) ApplyPowerRules(true);
+            };
+            _cboBatteryProfile.SelectedIndexChanged += (s, e) =>
+            {
+                SaveState("AutoPowerBattery", _cboBatteryProfile.SelectedIndex);
+                if (_isPluggedIn == false) ApplyPowerRules(false);
+            };
 
             y += S(30) + S(20);
             MakeSectionHeader("FAN CONTROL", pad, y);
@@ -687,6 +736,8 @@ namespace PredatorControlApp
                 using var form = new GameSyncForm(_gameSync, _maxHz);
                 form.ShowDialog(this);
             };
+
+            _contentPanel.AutoScrollMinSize = new Size(0, y + btnH + S(50));
         }
 
         private void UpdateRgbControls(int mode)
@@ -888,14 +939,14 @@ namespace PredatorControlApp
                     if (parts.Length == 2 && int.TryParse(parts[0], out int x) && int.TryParse(parts[1], out int y))
                         pts.Add(new Point(x, y));
                 }
-                return pts.Count >= 2 ? pts : null;
+                return pts.Count >= 2 ? FanCurveGraph.Normalize(pts) : null;
             }
             catch { return null; }
         }
 
         private void ApplyDisplayMode(int hz, PredatorButton btn)
         {
-            SetRefreshRate(hz);
+            if (!SetRefreshRate(hz)) return;   
             HighlightBtn(btn, ref _activeDisplayBtn);
             CheckTrayItem(hz <= 60 ? _trayDisplay60 : _trayDisplayMax, _trayDisplay60, _trayDisplayMax);
         }
@@ -1020,6 +1071,12 @@ namespace PredatorControlApp
             if (InvokeRequired) { Invoke(() => OnGameDetected(profile)); return; }
 
             _isGameSyncOverriding = true;
+            try { await ApplyGameProfile(profile); }
+            finally { _isGameSyncOverriding = false; }
+        }
+
+        private async Task ApplyGameProfile(GameProfile profile)
+        {
             _lblGameSyncStatus.Text = $"Active \u2014 {profile.DisplayName}";
 
             _gameSync.SetPreGameSnapshot(CaptureCurrentState());
@@ -1050,13 +1107,8 @@ namespace PredatorControlApp
                 }
             }
 
-            if (profile.RefreshRate >= 0)
-            {
-                int hz = profile.RefreshRate;
-                SetRefreshRate(hz);
-                HighlightBtn(hz <= 60 ? _btn60Hz : _btnMaxHz, ref _activeDisplayBtn);
-                CheckTrayItem(hz <= 60 ? _trayDisplay60 : _trayDisplayMax, _trayDisplay60, _trayDisplayMax);
-            }
+            if (profile.RefreshRate > 0)
+                ApplyDisplayMode(profile.RefreshRate, profile.RefreshRate <= 60 ? _btn60Hz : _btnMaxHz);
 
             if (profile.BatteryLimit >= 0)
                 ApplyBatteryLimit(profile.BatteryLimit == 1);
@@ -1066,25 +1118,23 @@ namespace PredatorControlApp
 
             if (profile.RgbMode >= 0)
             {
-                int mode = profile.RgbMode;
-                byte bright = profile.RgbBrightness >= 0 ? (byte)profile.RgbBrightness : (byte)_brightnessSlider.Value;
-                byte speed = profile.RgbSpeed >= 0 ? (byte)Math.Clamp(Math.Round(profile.RgbSpeed * 9.0 / 100.0), 1, 9) : GetMappedSpeed();
-                byte r = profile.RgbR >= 0 ? (byte)profile.RgbR : _wmi.LastR;
-                byte g = profile.RgbG >= 0 ? (byte)profile.RgbG : _wmi.LastG;
-                byte b = profile.RgbB >= 0 ? (byte)profile.RgbB : _wmi.LastB;
+                int mode = Math.Clamp(profile.RgbMode, 0, 7);
+                int brightVal = profile.RgbBrightness >= 0 ? Math.Clamp(profile.RgbBrightness, 0, 100) : _brightnessSlider.Value;
+                int speedVal = profile.RgbSpeed >= 0 ? Math.Clamp(profile.RgbSpeed, 1, 100) : _speedSlider.Value;
+                byte bright = (byte)brightVal;
+                byte speed = profile.RgbSpeed >= 0 ? (byte)Math.Clamp(Math.Round(speedVal * 9.0 / 100.0), 1, 9) : GetMappedSpeed();
+                byte r = profile.RgbR >= 0 ? (byte)Math.Clamp(profile.RgbR, 0, 255) : _wmi.LastR;
+                byte g = profile.RgbG >= 0 ? (byte)Math.Clamp(profile.RgbG, 0, 255) : _wmi.LastG;
+                byte b = profile.RgbB >= 0 ? (byte)Math.Clamp(profile.RgbB, 0, 255) : _wmi.LastB;
 
                 _wmi.SetRgbMode(mode, r, g, b, bright, speed, 0);
                 if (_rgbDropDown.SelectedIndex != mode)
                     _rgbDropDown.SelectedIndex = mode;
-                if (profile.RgbBrightness >= 0)
-                    _brightnessSlider.Value = profile.RgbBrightness;
-                if (profile.RgbSpeed >= 0)
-                    _speedSlider.Value = profile.RgbSpeed;
+                _brightnessSlider.Value = brightVal;
+                _speedSlider.Value = speedVal;
                 UpdateRgbControls(mode);
                 CheckRgbTrayFromMode(mode);
             }
-
-            _isGameSyncOverriding = false;
         }
 
         private async void OnGameExited(DashboardSnapshot snap)
@@ -1092,6 +1142,12 @@ namespace PredatorControlApp
             if (InvokeRequired) { Invoke(() => OnGameExited(snap)); return; }
 
             _isGameSyncOverriding = true;
+            try { await RestoreSnapshot(snap); }
+            finally { _isGameSyncOverriding = false; }
+        }
+
+        private async Task RestoreSnapshot(DashboardSnapshot snap)
+        {
             _lblGameSyncStatus.Text = "Active \u2014 Monitoring";
 
             ApplyPowerMode(snap.PowerMode, PowerByteToBtn(snap.PowerMode));
@@ -1123,26 +1179,30 @@ namespace PredatorControlApp
                 }
             }
 
-            SetRefreshRate(snap.RefreshRate);
-            HighlightBtn(snap.RefreshRate <= 60 ? _btn60Hz : _btnMaxHz, ref _activeDisplayBtn);
-            CheckTrayItem(snap.RefreshRate <= 60 ? _trayDisplay60 : _trayDisplayMax, _trayDisplay60, _trayDisplayMax);
+            if (snap.RefreshRate > 0)
+                ApplyDisplayMode(snap.RefreshRate, snap.RefreshRate <= 60 ? _btn60Hz : _btnMaxHz);
 
             ApplyBatteryLimit(snap.BatteryLimit == 1);
 
             await Task.Delay(500);
             if (IsDisposed) return;
 
-            _wmi.SetRgbMode(snap.RgbMode, (byte)snap.RgbR, (byte)snap.RgbG, (byte)snap.RgbB,
-                            (byte)snap.RgbBrightness,
-                            (byte)Math.Clamp(Math.Round(snap.RgbSpeed * 9.0 / 100.0), 1, 9), 0);
-            if (_rgbDropDown.SelectedIndex != snap.RgbMode)
-                _rgbDropDown.SelectedIndex = snap.RgbMode;
-            _brightnessSlider.Value = snap.RgbBrightness;
-            _speedSlider.Value = snap.RgbSpeed;
-            UpdateRgbControls(snap.RgbMode);
-            CheckRgbTrayFromMode(snap.RgbMode);
+            int rgbMode = Math.Clamp(snap.RgbMode, 0, 7);
+            int bright = Math.Clamp(snap.RgbBrightness, 0, 100);
+            int speed = Math.Clamp(snap.RgbSpeed, 1, 100);
 
-            _isGameSyncOverriding = false;
+            _wmi.SetRgbMode(rgbMode,
+                            (byte)Math.Clamp(snap.RgbR, 0, 255),
+                            (byte)Math.Clamp(snap.RgbG, 0, 255),
+                            (byte)Math.Clamp(snap.RgbB, 0, 255),
+                            (byte)bright,
+                            (byte)Math.Clamp(Math.Round(speed * 9.0 / 100.0), 1, 9), 0);
+            if (_rgbDropDown.SelectedIndex != rgbMode)
+                _rgbDropDown.SelectedIndex = rgbMode;
+            _brightnessSlider.Value = bright;
+            _speedSlider.Value = speed;
+            UpdateRgbControls(rgbMode);
+            CheckRgbTrayFromMode(rgbMode);
         }
 
         #endregion
@@ -1160,20 +1220,33 @@ namespace PredatorControlApp
             catch { }
         }
 
+        private static int GetInt(RegistryKey key, string name, int fallback, int min, int max)
+        {
+            int v = fallback;
+            try
+            {
+                object? raw = key.GetValue(name);
+                if (raw is int i) v = i;
+                else if (raw != null && int.TryParse(raw.ToString(), out int p)) v = p;
+            }
+            catch { }
+            return Math.Clamp(v, min, max);
+        }
+
         private void LoadMemory()
         {
             try
             {
                 using var key = Registry.CurrentUser.CreateSubKey(@"SOFTWARE\PredatorControl");
-                int savedPower = (int)key.GetValue("Power", 0x01);
-                int savedFan = (int)key.GetValue("Fan", 0x01);
-                int savedRgbMode = (int)key.GetValue("RGB_Mode", 3);
-                int savedBrightness = (int)key.GetValue("Brightness", 100);
-                int savedSpeed = (int)key.GetValue("RGB_Speed", 50);
+                int savedPower = GetInt(key, "Power", 0x01, 0x00, 0xFF);
+                int savedFan = GetInt(key, "Fan", 0x01, 0x00, 0xFF);
+                int savedRgbMode = GetInt(key, "RGB_Mode", 3, 0, 7);
+                int savedBrightness = GetInt(key, "Brightness", 100, 0, 100);
+                int savedSpeed = GetInt(key, "RGB_Speed", 50, 1, 100);
 
-                int savedR = (int)key.GetValue("RGB_R", 0);
-                int savedG = (int)key.GetValue("RGB_G", 150);
-                int savedB = (int)key.GetValue("RGB_B", 255);
+                int savedR = GetInt(key, "RGB_R", 0, 0, 255);
+                int savedG = GetInt(key, "RGB_G", 150, 0, 255);
+                int savedB = GetInt(key, "RGB_B", 255, 0, 255);
                 _colorPicker.Color = Color.FromArgb(savedR, savedG, savedB);
 
                 _brightnessSlider.Value = Math.Clamp(savedBrightness, 0, 100);
@@ -1191,13 +1264,11 @@ namespace PredatorControlApp
                 };
                 ApplyPowerMode(powerMode, powerBtn);
 
-                int savedAcProfile = Math.Clamp((int)key.GetValue("AutoPowerAC", 0), 0, _cboAcProfile.Items.Count - 1);
-                int savedBatProfile = Math.Clamp((int)key.GetValue("AutoPowerBattery", 0), 0, _cboBatteryProfile.Items.Count - 1);
-                _cboAcProfile.SelectedIndex = savedAcProfile;
-                _cboBatteryProfile.SelectedIndex = savedBatProfile;
+                _cboAcProfile.SelectedIndex = GetInt(key, "AutoPowerAC", 0, 0, _cboAcProfile.Items.Count - 1);
+                _cboBatteryProfile.SelectedIndex = GetInt(key, "AutoPowerBattery", 0, 0, _cboBatteryProfile.Items.Count - 1);
 
-                int savedFanSpeedCpu = Math.Clamp((int)key.GetValue("FanSpeedCpu", 50), 10, 100);
-                int savedFanSpeedGpu = Math.Clamp((int)key.GetValue("FanSpeedGpu", 50), 10, 100);
+                int savedFanSpeedCpu = GetInt(key, "FanSpeedCpu", 50, 10, 100);
+                int savedFanSpeedGpu = GetInt(key, "FanSpeedGpu", 50, 10, 100);
 
                 var (fanMode, fanBtn) = savedFan switch
                 {
@@ -1211,7 +1282,7 @@ namespace PredatorControlApp
                 if (loadedCpu != null) _cpuCurvePoints = loadedCpu;
                 if (loadedGpu != null) _gpuCurvePoints = loadedGpu;
 
-                int savedCurveEnabled = (int)key.GetValue("FanCurveEnabled", 0);
+                int savedCurveEnabled = GetInt(key, "FanCurveEnabled", 0, 0, 1);
                 if (savedCurveEnabled == 1 && fanMode == 0x03)
                     _fanCurveEnabled = true;
 
@@ -1257,8 +1328,7 @@ namespace PredatorControlApp
 
                 if (_wmi.IsBatteryControlSupported())
                 {
-                    int savedBatteryLimit = (int)key.GetValue("BatteryLimit", 0);
-                    bool limitEnabled = savedBatteryLimit == 1;
+                    bool limitEnabled = GetInt(key, "BatteryLimit", 0, 0, 1) == 1;
 
                     _wmi.SetBatteryChargeLimit(limitEnabled);
 
@@ -1284,28 +1354,29 @@ namespace PredatorControlApp
             catch { }
         }
 
-        private void RegisterStartup()
-        {
-            try
-            {
-                using var key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", true);
-                string appPath = $"\"{Application.ExecutablePath}\" -hidden";
-                key?.SetValue("PredatorControl", appPath);
-            }
-            catch { }
-        }
-
         #endregion
 
         #region Telemetry & Power Rules
 
         private void UpdateTelemetry(object? sender, EventArgs e)
         {
-            bool currentlyPluggedIn = SystemInformation.PowerStatus.PowerLineStatus == PowerLineStatus.Online;
-            if (_isPluggedIn != currentlyPluggedIn)
+            try { UpdateTelemetryCore(); }
+            catch (Exception ex) { Program.Report(ex, false); }
+        }
+
+        private void UpdateTelemetryCore()
+        {
+            var line = SystemInformation.PowerStatus.PowerLineStatus;
+
+            if (line != PowerLineStatus.Unknown)
             {
-                _isPluggedIn = currentlyPluggedIn;
-                ApplyPowerRules(currentlyPluggedIn);
+                bool pluggedIn = line == PowerLineStatus.Online;
+                if (_isPluggedIn != pluggedIn)
+                {
+                    try { ApplyPowerRules(pluggedIn); }
+                    catch (Exception ex) { Program.Report(ex, false); }
+                    finally { _isPluggedIn = pluggedIn; }
+                }
             }
 
             _cpuTemp = _wmi.CpuTemp;
@@ -1391,9 +1462,9 @@ namespace PredatorControlApp
                 _trayPowerEco.Enabled = false;
 
                 int acIdx = _cboAcProfile.SelectedIndex;
-                if (acIdx > 0)
+                if (acIdx > 0 && acIdx < AcProfileValues.Length)
                 {
-                    byte mode = PowerProfileValues[acIdx];
+                    byte mode = AcProfileValues[acIdx];
                     ApplyPowerMode(mode, PowerByteToBtn(mode));
                 }
                 else if (_activePowerBtn == _btnEco)
@@ -1411,9 +1482,9 @@ namespace PredatorControlApp
                 _trayPowerEco.Enabled = true;
 
                 int batIdx = _cboBatteryProfile.SelectedIndex;
-                if (batIdx > 0)
+                if (batIdx > 0 && batIdx < BatteryProfileValues.Length)
                 {
-                    byte mode = PowerProfileValues[batIdx];
+                    byte mode = BatteryProfileValues[batIdx];
                     ApplyPowerMode(mode, PowerByteToBtn(mode));
                 }
                 else if (_activePowerBtn == _btnPerform || _activePowerBtn == _btnTurbo)
@@ -1472,7 +1543,7 @@ namespace PredatorControlApp
                 _trayIcon.Visible = false;
                 _timer.Stop();
                 _gameSync.Dispose();
-                _appMutex.Dispose();
+                _appMutex?.Dispose();
                 base.OnFormClosing(e);
             }
         }

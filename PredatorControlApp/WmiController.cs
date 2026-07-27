@@ -44,7 +44,8 @@ namespace PredatorControlApp
                 try
                 {
                     using var searcher = new ManagementObjectSearcher(@"root\WMI", "SELECT * FROM AcerGamingFunction");
-                    _cachedObj = searcher.Get().Cast<ManagementObject>().FirstOrDefault();
+                    using var results = searcher.Get();
+                    _cachedObj = results.Cast<ManagementObject>().FirstOrDefault();
                 }
                 catch { _cachedObj = null; }
                 return _cachedObj;
@@ -53,7 +54,11 @@ namespace PredatorControlApp
 
         private void InvalidateCache()
         {
-            lock (_lock) { _cachedObj = null; }
+            lock (_lock)
+            {
+                try { _cachedObj?.Dispose(); } catch { }
+                _cachedObj = null;
+            }
         }
 
         private (bool success, ulong output) SendCommand(string method, ulong input)
@@ -106,10 +111,12 @@ namespace PredatorControlApp
                 using var inParams = obj.GetMethodParameters("GetGamingSysInfo");
                 inParams["gmInput"] = (ulong)(0x0001 | (sensorId << 8));
                 using var outParams = obj.InvokeMethod("GetGamingSysInfo", inParams, null);
-                var raw = (ulong)outParams["gmOutput"];
+                ulong raw = Convert.ToUInt64(outParams["gmOutput"]);
                 if ((raw & 0xFF) == 0) return (int)((raw >> 8) & 0xFFFF);
             }
-            catch { InvalidateCache(); }
+            catch (ManagementException) { InvalidateCache(); }
+            catch (COMException) { InvalidateCache(); }
+            catch { }
             return 0;
         }
 
@@ -235,7 +242,8 @@ namespace PredatorControlApp
             try
             {
                 using var searcher = new ManagementObjectSearcher(@"root\WMI", "SELECT * FROM BatteryControl");
-                return searcher.Get().Cast<ManagementObject>().FirstOrDefault();
+                using var results = searcher.Get();
+                return results.Cast<ManagementObject>().FirstOrDefault();
             }
             catch
             {

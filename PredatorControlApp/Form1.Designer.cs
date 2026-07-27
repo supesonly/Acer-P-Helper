@@ -9,6 +9,7 @@ namespace PredatorControlApp
             if (disposing)
             {
                 _wmi?.Dispose();
+                _gameSync?.Dispose();    
                 _trayIcon?.Dispose();
                 _timer?.Dispose();
                 components?.Dispose();

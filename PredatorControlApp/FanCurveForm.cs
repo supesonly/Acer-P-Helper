@@ -87,7 +87,7 @@ namespace PredatorControlApp
             BackColor = FormBg;
             ShowInTaskbar = false;
             DoubleBuffered = true;
-            try { Icon = new Icon("appicon.ico"); } catch { }
+            try { Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { }
 
             int totalHeight = TitleBarHeight + SepHeight
                             + GraphHeight + SepHeight

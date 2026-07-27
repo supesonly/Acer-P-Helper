@@ -52,10 +52,17 @@ namespace PredatorControlApp
 
         public GameSyncController()
         {
-            var appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-            var dir = Path.Combine(appData, "PredatorControl");
-            Directory.CreateDirectory(dir);
-            _savePath = Path.Combine(dir, "game_sync.json");
+            _savePath = "";
+            try
+            {
+                var appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                if (string.IsNullOrEmpty(appData))
+                    appData = Path.GetTempPath();
+                var dir = Path.Combine(appData, "PredatorControl");
+                Directory.CreateDirectory(dir);
+                _savePath = Path.Combine(dir, "game_sync.json");
+            }
+            catch { }
 
             _pollTimer = new System.Windows.Forms.Timer { Interval = 3000 };
             _pollTimer.Tick += PollProcesses;
