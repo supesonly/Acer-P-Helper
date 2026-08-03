@@ -27,6 +27,37 @@ namespace PredatorControlApp
             Debug.Assert(Form1.BatteryProfileValues[3] == 0x06, "battery Eco must map to 0x06");
             Debug.Assert(Form1.AcProfileValues.Length == 5, "AC table size");
             Debug.Assert(Form1.AcProfileValues[4] == 0x05, "AC Turbo must map to 0x05");
+
+            CheckPowerLineDebounce();
+        }
+
+        private static void CheckPowerLineDebounce()
+        {
+            bool? pending = null;
+            int ticks = 0;
+            bool? state = false;
+
+            state = Form1.DebouncePowerLine(PowerLineStatus.Online, state, ref pending, ref ticks);
+            Debug.Assert(state == false, "one Online sample must not flip state");
+
+            state = Form1.DebouncePowerLine(PowerLineStatus.Offline, state, ref pending, ref ticks);
+            Debug.Assert(state == false, "a contradicting sample must restart the count");
+
+            state = Form1.DebouncePowerLine(PowerLineStatus.Online, state, ref pending, ref ticks);
+            state = Form1.DebouncePowerLine(PowerLineStatus.Online, state, ref pending, ref ticks);
+            Debug.Assert(state == true, "two agreeing samples must flip state");
+
+            state = Form1.DebouncePowerLine(PowerLineStatus.Unknown, state, ref pending, ref ticks);
+            Debug.Assert(state == true, "Unknown must not change state");
+            Debug.Assert(ticks == 0 && pending == null, "Unknown must reset the count");
+
+            bool? unknownStart = null;
+            pending = null;
+            ticks = 0;
+            unknownStart = Form1.DebouncePowerLine(PowerLineStatus.Offline, unknownStart, ref pending, ref ticks);
+            Debug.Assert(unknownStart == null, "unresolved state must stay unresolved after one sample");
+            unknownStart = Form1.DebouncePowerLine(PowerLineStatus.Offline, unknownStart, ref pending, ref ticks);
+            Debug.Assert(unknownStart == false, "unresolved state must resolve after two agreeing samples");
         }
     }
 }

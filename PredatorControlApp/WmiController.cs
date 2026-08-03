@@ -221,6 +221,8 @@ namespace PredatorControlApp
 
         public int CpuTemp => GetSensorReading(0x01);
         public int GpuTemp => GetSensorReading(0x0A);
+        public int CpuFanRpm => GetSensorReading(0x02);
+        public int GpuFanRpm => GetSensorReading(0x06);
 
         private void SyncWindowsPowerMode(byte acerMode)
         {

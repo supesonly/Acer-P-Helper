@@ -113,6 +113,9 @@ namespace PredatorControlApp
         private DarkScrollPanel _contentPanel = null!;
 
         private bool? _isPluggedIn;
+        private bool? _pendingPluggedIn;
+        private int _powerLineStableTicks;
+        private bool _isResyncing;
         private bool _isClosing;
         private int _maxHz;
         private float _dpiScale = 1f; 
@@ -131,6 +134,7 @@ namespace PredatorControlApp
         private static readonly Font FontBodyBold = new("Segoe UI", 9.5f, FontStyle.Bold);
 
         private Label _lblTitle = null!, _lblCpuTemp = null!, _lblGpuTemp = null!;
+        private Label _lblCpuRpm = null!, _lblGpuRpm = null!;
         private Label _lblPowerStatus = null!, _lblFanStatus = null!;
         private Label _lblBrightHdr = null!, _lblSpeedHdr = null!;
         private Label _lblCpuFanSpeedHdr = null!, _lblGpuFanSpeedHdr = null!;
@@ -244,6 +248,9 @@ namespace PredatorControlApp
             _timer.Interval = 2000;
             _timer.Tick += UpdateTelemetry;
             _timer.Start();
+
+            SystemEvents.PowerModeChanged += OnPowerModeChanged;
+            this.FormClosed += (s, e) => SystemEvents.PowerModeChanged -= OnPowerModeChanged;
 
             this.Shown += (s, e) =>
             {
@@ -442,6 +449,13 @@ namespace PredatorControlApp
 
             MakeLabel("GPU:", _formW / 2 + S(10), y, FontBody, SubHeaderColor);
             _lblGpuTemp = MakeLabel("39°C", _formW / 2 + S(46), y, FontBodyBold, Color.White);
+
+            y += S(24);
+            MakeLabel("CPU FAN:", pad, y, FontBody, SubHeaderColor);
+            _lblCpuRpm = MakeLabel("-- RPM", pad + S(64), y, FontBodyBold, Color.White);
+
+            MakeLabel("GPU FAN:", _formW / 2 + S(10), y, FontBody, SubHeaderColor);
+            _lblGpuRpm = MakeLabel("-- RPM", _formW / 2 + S(74), y, FontBodyBold, Color.White);
 
             y += S(24);
             MakeLabel("Fan speed:", pad, y, FontBody, SubHeaderColor);
@@ -1141,6 +1155,8 @@ namespace PredatorControlApp
         {
             if (InvokeRequired) { Invoke(() => OnGameExited(snap)); return; }
 
+            _lblGameSyncStatus.Text = "Active \u2014 Monitoring";
+
             _isGameSyncOverriding = true;
             try { await RestoreSnapshot(snap); }
             finally { _isGameSyncOverriding = false; }
@@ -1148,8 +1164,6 @@ namespace PredatorControlApp
 
         private async Task RestoreSnapshot(DashboardSnapshot snap)
         {
-            _lblGameSyncStatus.Text = "Active \u2014 Monitoring";
-
             ApplyPowerMode(snap.PowerMode, PowerByteToBtn(snap.PowerMode));
             ApplyFanMode(snap.FanMode, FanByteToBtn(snap.FanMode));
 
@@ -1358,6 +1372,67 @@ namespace PredatorControlApp
 
         #region Telemetry & Power Rules
 
+        private void OnPowerModeChanged(object? sender, PowerModeChangedEventArgs e)
+        {
+            if (e.Mode != PowerModes.Resume) return;
+            if (_isClosing || IsDisposed || !IsHandleCreated) return;
+
+            try { BeginInvoke(new Action(async () => await ResyncAfterResume())); }
+            catch { }
+        }
+
+        private async Task ResyncAfterResume()
+        {
+            if (_isResyncing) return;
+            _isResyncing = true;
+
+            try
+            {
+                _isPluggedIn = null;
+                _lastCurveCpuSpeed = -1;
+                _lastCurveGpuSpeed = -1;
+
+                var snap = CaptureCurrentState();
+                snap.RefreshRate = _activeDisplayBtn == _btn60Hz ? 60 : _maxHz;
+
+                await Task.Delay(3000);
+                if (_isClosing || IsDisposed) return;
+
+                await RestoreSnapshot(snap);
+            }
+            catch (Exception ex) { Program.Report(ex, false); }
+            finally
+            {
+                _pendingPluggedIn = null;
+                _powerLineStableTicks = 0;
+                _isResyncing = false;
+            }
+        }
+
+        internal static bool? DebouncePowerLine(PowerLineStatus line, bool? current, ref bool? pending, ref int ticks)
+        {
+            if (line == PowerLineStatus.Unknown)
+            {
+                pending = null;
+                ticks = 0;
+                return current;
+            }
+
+            bool pluggedIn = line == PowerLineStatus.Online;
+
+            if (pending != pluggedIn)
+            {
+                pending = pluggedIn;
+                ticks = 1;
+            }
+            else if (ticks < 2)
+            {
+                ticks++;
+            }
+
+            return ticks >= 2 ? pluggedIn : current;
+        }
+
         private void UpdateTelemetry(object? sender, EventArgs e)
         {
             try { UpdateTelemetryCore(); }
@@ -1366,34 +1441,39 @@ namespace PredatorControlApp
 
         private void UpdateTelemetryCore()
         {
-            var line = SystemInformation.PowerStatus.PowerLineStatus;
+            bool? confirmed = DebouncePowerLine(SystemInformation.PowerStatus.PowerLineStatus,
+                                                _isPluggedIn, ref _pendingPluggedIn, ref _powerLineStableTicks);
 
-            if (line != PowerLineStatus.Unknown)
+            if (confirmed != _isPluggedIn && !_isResyncing)
             {
-                bool pluggedIn = line == PowerLineStatus.Online;
-                if (_isPluggedIn != pluggedIn)
-                {
-                    try { ApplyPowerRules(pluggedIn); }
-                    catch (Exception ex) { Program.Report(ex, false); }
-                    finally { _isPluggedIn = pluggedIn; }
-                }
+                try { ApplyPowerRules(confirmed == true); }
+                catch (Exception ex) { Program.Report(ex, false); }
+                finally { _isPluggedIn = confirmed; }
             }
 
             _cpuTemp = _wmi.CpuTemp;
 
+            int cpuRpm = _wmi.CpuFanRpm;
+            int gpuRpm;
+
             if (_isPluggedIn == true)
             {
                 _gpuTemp = _wmi.GpuTemp;
+                gpuRpm = _wmi.GpuFanRpm;
             }
             else
             {
-                _gpuTemp = 0; 
+                _gpuTemp = 0;
+                gpuRpm = 0;
             }
 
             _lblCpuTemp.Text = _cpuTemp > 0 ? $"{_cpuTemp}°C" : "--°C";
             _lblGpuTemp.Text = _gpuTemp > 0 ? $"{_gpuTemp}°C" : "--°C";
             _lblCpuTemp.ForeColor = TempColor(_cpuTemp);
             _lblGpuTemp.ForeColor = TempColor(_gpuTemp);
+
+            _lblCpuRpm.Text = cpuRpm > 0 ? $"{cpuRpm} RPM" : "-- RPM";
+            _lblGpuRpm.Text = gpuRpm > 0 ? $"{gpuRpm} RPM" : "-- RPM";
 
             _trayIcon.Text = $"Predator Control\nCPU: {(_cpuTemp > 0 ? $"{_cpuTemp}°C" : "N/A")}  GPU: {(_gpuTemp > 0 ? $"{_gpuTemp}°C" : "N/A")}";
 
