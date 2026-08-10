@@ -85,6 +85,14 @@ namespace PredatorControlApp
 
             using var none = System.Text.Json.JsonDocument.Parse("""{"assets":[{"name":"notes.txt","browser_download_url":"http://x/n"}]}""");
             Debug.Assert(Updater.PickAsset(none.RootElement, true) == null, "non-exe assets must be ignored");
+
+            string plain = Updater.Plain("## What's new\r\n\r\n**Bold.** text\r\n\r\n\r\n- one\r\n* two\r\n\r\n`code` and [link](http://x)");
+            Debug.Assert(!plain.Contains('#') && !plain.Contains('*') && !plain.Contains('`'), "markdown syntax must be stripped");
+            Debug.Assert(plain.StartsWith("What's new"), "headings must lose their hashes");
+            Debug.Assert(plain.Contains("\u2022 one") && plain.Contains("\u2022 two"), "list markers must become bullets");
+            Debug.Assert(plain.Contains("link") && !plain.Contains("http://x"), "link text must survive, url must not");
+            string nl = Environment.NewLine;
+            Debug.Assert(!plain.Contains(nl + nl + nl) && !plain.EndsWith(nl), "blank runs must collapse and not trail");
         }
     }
 }

@@ -5,6 +5,7 @@ using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Microsoft.Win32;
 
 namespace PredatorControlApp
@@ -182,55 +183,147 @@ namespace PredatorControlApp
         #region Dialog
 
         private static readonly Color FormBg = Color.FromArgb(22, 22, 26);
+        private static readonly Color TitleBarBg = Color.FromArgb(18, 18, 21);
         private static readonly Color PanelBg = Color.FromArgb(30, 30, 34);
-        private static readonly Color HeaderColor = Color.FromArgb(120, 120, 135);
+        private static readonly Color SeparatorColor = Color.FromArgb(40, 40, 44);
+        private static readonly Color TitleTextColor = Color.FromArgb(200, 200, 205);
+        private static readonly Color CloseHoverColor = Color.FromArgb(220, 50, 50);
+        private static readonly Color BodyColor = Color.FromArgb(165, 165, 175);
         private static readonly Color TextColor = Color.FromArgb(210, 210, 215);
+
+        private const int WM_NCLBUTTONDOWN = 0xA1;
+        private const int HT_CAPTION = 0x2;
+
+        [DllImport("user32.dll")]
+        private static extern int SendMessage(IntPtr hWnd, int msg, int wParam, int lParam);
+
+        [DllImport("user32.dll")]
+        private static extern bool ReleaseCapture();
+
+        private static void Drag(Form dlg, MouseEventArgs e)
+        {
+            if (e.Button != MouseButtons.Left) return;
+            ReleaseCapture();
+            SendMessage(dlg.Handle, WM_NCLBUTTONDOWN, HT_CAPTION, 0);
+        }
+
+        internal static string Plain(string markdown)
+        {
+            var sb = new StringBuilder();
+            bool blank = false;
+
+            foreach (string raw in markdown.Replace("\r\n", "\n").Split('\n'))
+            {
+                string line = raw.TrimEnd();
+
+                if (line.Length == 0)
+                {
+                    blank = sb.Length > 0;
+                    continue;
+                }
+
+                if (blank) sb.AppendLine();
+                blank = false;
+
+                line = Regex.Replace(line, @"^\s{0,3}#{1,6}\s*", "");
+                line = Regex.Replace(line, @"^\s*[-*+]\s+", "\u2022 ");
+                line = Regex.Replace(line, @"\[([^\]]+)\]\([^)]*\)", "$1");
+                line = Regex.Replace(line, @"`([^`]*)`", "$1");
+                line = line.Replace("**", "").Replace("__", "");
+
+                sb.AppendLine(line);
+            }
+
+            return sb.ToString().Trim();
+        }
 
         internal static bool ShowNotes(IWin32Window owner, string title, string subtitle, string notes, bool confirm)
         {
+            const int W = 520, Bar = 36, Pad = 20, BtnW = 120, BtnH = 34, BodyH = 300;
+            int bodyY = Bar + 72;
+            int btnY = bodyY + BodyH + Pad;
+
             using var dlg = new Form
             {
                 Text = title,
                 StartPosition = FormStartPosition.CenterParent,
-                FormBorderStyle = FormBorderStyle.FixedDialog,
-                MaximizeBox = false,
-                MinimizeBox = false,
+                FormBorderStyle = FormBorderStyle.None,
                 ShowInTaskbar = false,
+                KeyPreview = true,
                 BackColor = FormBg,
-                ClientSize = new Size(460, 400),
+                ClientSize = new Size(W, btnY + BtnH + Pad),
                 DialogResult = DialogResult.Cancel
             };
+
+            var bar = new Panel { Location = Point.Empty, Size = new Size(W, Bar), BackColor = TitleBarBg };
+            bar.MouseDown += (s, e) => Drag(dlg, e);
+            dlg.Controls.Add(bar);
+
+            var lblTitle = new Label
+            {
+                Text = title,
+                Location = new Point(14, 9),
+                AutoSize = true,
+                Font = new Font("Segoe UI", 10f, FontStyle.Bold),
+                ForeColor = TitleTextColor,
+                BackColor = Color.Transparent
+            };
+            lblTitle.MouseDown += (s, e) => Drag(dlg, e);
+            bar.Controls.Add(lblTitle);
+
+            var lblClose = new Label
+            {
+                Text = "\u2715",
+                Location = new Point(W - Bar, 0),
+                Size = new Size(Bar, Bar),
+                TextAlign = ContentAlignment.MiddleCenter,
+                Font = new Font("Segoe UI", 10f),
+                ForeColor = TitleTextColor,
+                Cursor = Cursors.Hand
+            };
+            lblClose.MouseEnter += (s, e) => lblClose.ForeColor = CloseHoverColor;
+            lblClose.MouseLeave += (s, e) => lblClose.ForeColor = TitleTextColor;
+            lblClose.Click += (s, e) => dlg.Close();
+            bar.Controls.Add(lblClose);
+
+            dlg.Controls.Add(new Panel
+            {
+                Location = new Point(0, Bar),
+                Size = new Size(W, 1),
+                BackColor = SeparatorColor
+            });
 
             dlg.Controls.Add(new Label
             {
                 Text = subtitle,
-                Location = new Point(20, 16),
-                AutoSize = true,
-                Font = new Font("Segoe UI", 11f, FontStyle.Bold),
+                Location = new Point(Pad, Bar + 16),
+                Size = new Size(W - Pad * 2, 48),
+                Font = new Font("Segoe UI", 10f, FontStyle.Bold),
                 ForeColor = TextColor,
                 BackColor = Color.Transparent
             });
 
             var txt = new TextBox
             {
-                Text = notes,
-                Location = new Point(20, 48),
-                Size = new Size(420, 280),
+                Text = Plain(notes),
+                Location = new Point(Pad, bodyY),
+                Size = new Size(W - Pad * 2, BodyH),
                 Multiline = true,
                 ReadOnly = true,
+                TabStop = false,
                 ScrollBars = ScrollBars.Vertical,
                 BorderStyle = BorderStyle.FixedSingle,
                 BackColor = PanelBg,
-                ForeColor = HeaderColor,
-                Font = new Font("Segoe UI", 9f)
+                ForeColor = BodyColor,
+                Font = new Font("Segoe UI", 9.5f)
             };
             dlg.Controls.Add(txt);
 
             var btnPrimary = new PredatorButton
             {
                 Text = confirm ? "Update Now" : "Close",
-                Location = new Point(confirm ? 250 : 330, 344),
-                Size = new Size(110, 34)
+                Location = new Point(W - Pad - BtnW, btnY),
+                Size = new Size(BtnW, BtnH)
             };
             btnPrimary.Click += (s, e) => { dlg.DialogResult = DialogResult.OK; dlg.Close(); };
             dlg.Controls.Add(btnPrimary);
@@ -240,14 +333,20 @@ namespace PredatorControlApp
                 var btnLater = new PredatorButton
                 {
                     Text = "Later",
-                    Location = new Point(130, 344),
-                    Size = new Size(110, 34)
+                    Location = new Point(W - Pad - BtnW * 2 - 12, btnY),
+                    Size = new Size(BtnW, BtnH)
                 };
                 btnLater.Click += (s, e) => dlg.Close();
                 dlg.Controls.Add(btnLater);
             }
 
-            dlg.Shown += (s, e) => txt.Select(0, 0);
+            dlg.KeyDown += (s, e) => { if (e.KeyCode == Keys.Escape) dlg.Close(); };
+            dlg.Shown += (s, e) =>
+            {
+                txt.Select(0, 0);
+                dlg.ActiveControl = btnPrimary;
+            };
+
             return dlg.ShowDialog(owner) == DialogResult.OK;
         }
 
