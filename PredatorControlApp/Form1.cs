@@ -102,7 +102,7 @@ namespace PredatorControlApp
         #endregion
 
         #region Fields
-
+        
         private WmiController _wmi = new();
         private System.Windows.Forms.Timer _timer = new();
         private NotifyIcon _trayIcon = new();
@@ -181,6 +181,9 @@ namespace PredatorControlApp
         private PredatorToggle _switchStartWithWindows = null!;
         private Label _lblStartupStatus = null!;
 
+        private PredatorButton _btnCheckUpdates = null!;
+        private bool _updateCheckRunning;
+
         private static readonly string[] RgbModeNames = { "Static", "Breathing", "Neon", "Wave", "Shifting", "Zoom", "Meteor", "Twinkling" };
 
         private ToolStripMenuItem _trayPowerQuiet = null!, _trayPowerBal = null!, _trayPowerPerf = null!,
@@ -254,9 +257,72 @@ namespace PredatorControlApp
 
             this.Shown += (s, e) =>
             {
+                Updater.ShowPendingNotes(this);
+
                 if (Environment.CommandLine.Contains("-hidden")) HideApp();
             };
         }
+
+        #region Updates
+
+        private async Task CheckForUpdatesAsync()
+        {
+            if (_updateCheckRunning) return;
+            _updateCheckRunning = true;
+            _btnCheckUpdates.Enabled = false;
+
+            try
+            {
+                var info = await Updater.CheckAsync();
+
+                if (info == null)
+                {
+                    MessageBox.Show(this, $"You're on the latest version (v{Updater.CurrentText}).",
+                        "Predator Control", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+
+                await PromptUpdateAsync(info);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, $"Could not check for updates:\n{ex.Message}",
+                    "Predator Control", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+            finally
+            {
+                _updateCheckRunning = false;
+                if (!_btnCheckUpdates.IsDisposed) _btnCheckUpdates.Enabled = true;
+            }
+        }
+
+        private async Task PromptUpdateAsync(UpdateInfo info)
+        {
+            bool accepted = Updater.ShowNotes(this, "Update available",
+                $"Version {info.Version.ToString(3)} is available — you have v{Updater.CurrentText}",
+                info.Notes, confirm: true);
+
+            if (!accepted) return;
+
+            try
+            {
+                _btnCheckUpdates.Enabled = false;
+                _btnCheckUpdates.Text = "Downloading update…";
+                await Updater.ApplyAsync(info);
+
+                _isClosing = true;
+                Application.Exit();
+            }
+            catch (Exception ex)
+            {
+                _btnCheckUpdates.Enabled = true;
+                _btnCheckUpdates.Text = $"⬇  Check for Updates  (v{Updater.CurrentText})";
+                MessageBox.Show(this, $"Update failed:\n{ex.Message}",
+                    "Predator Control", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        #endregion
 
         protected override void WndProc(ref Message m)
         {
@@ -751,7 +817,21 @@ namespace PredatorControlApp
                 form.ShowDialog(this);
             };
 
-            _contentPanel.AutoScrollMinSize = new Size(0, y + btnH + S(50));
+            y += btnH + S(24);
+            AddSeparator(y);
+
+            y += S(20);
+            MakeSectionHeader("UPDATES", pad, y);
+
+            y += S(24);
+            int updBtnH = S(30), updBtnW = S(160);
+            var lblVersion = MakeLabel($"Version {Updater.CurrentText}", pad, y, FontBody, SubHeaderColor);
+            CenterV(lblVersion, y, updBtnH);
+
+            _btnCheckUpdates = MakeButton("⬇  Check for Updates", _formW - pad - updBtnW, y, updBtnW, updBtnH);
+            _btnCheckUpdates.Click += async (s, e) => await CheckForUpdatesAsync();
+
+            _contentPanel.AutoScrollMinSize = new Size(0, y + updBtnH + S(50));
         }
 
         private void UpdateRgbControls(int mode)
