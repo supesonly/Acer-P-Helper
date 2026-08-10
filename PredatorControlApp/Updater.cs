@@ -56,7 +56,7 @@ namespace PredatorControlApp
                 if (Flag(rel, "draft") || Flag(rel, "prerelease")) continue;
                 if (!TryParseTag(Str(rel, "tag_name"), out var v) || v <= current) continue;
 
-                notes.AppendLine($"â”€â”€ {Str(rel, "name", $"v{v.ToString(3)}")} â”€â”€")
+                notes.AppendLine($"--- {Str(rel, "name", $"v{v.ToString(3)}")} ---")
                      .AppendLine(Str(rel, "body").Trim().Replace("\r\n", "\n").Replace("\n", Environment.NewLine))
                      .AppendLine();
 
@@ -168,7 +168,7 @@ namespace PredatorControlApp
 
             if (Version.TryParse(version, out var v) && Norm(v) > Current)
             {
-                MessageBox.Show(owner, $"The update to v{version} could not be installed â€” you're still on v{CurrentText}.\n\n" +
+                MessageBox.Show(owner, $"The update to v{version} could not be installed - you're still on v{CurrentText}.\n\n" +
                     "This usually means the app file was locked or write-protected. Try again, or download it manually from GitHub.",
                     "Predator Control", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
