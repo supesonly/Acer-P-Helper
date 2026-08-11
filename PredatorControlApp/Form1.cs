@@ -1,5 +1,8 @@
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
+using System.Security.Principal;
+using System.Text;
 using Microsoft.Win32;
 
 namespace PredatorControlApp
@@ -179,6 +182,7 @@ namespace PredatorControlApp
         private bool _isGameSyncOverriding;
 
         private PredatorToggle _switchStartWithWindows = null!;
+        private bool _suppressStartupToggle;
         private Label _lblStartupStatus = null!;
 
         private PredatorButton _btnCheckUpdates = null!;
@@ -699,6 +703,8 @@ namespace PredatorControlApp
             _lblStartupStatus = MakeLabel("Start with Windows", pad, y, FontBody, SubHeaderColor);
             CenterV(_lblStartupStatus, y, switchH);
 
+            MigrateLegacyStartup();
+
             _switchStartWithWindows = new PredatorToggle
             {
                 Location = new Point(_formW - pad - S(48), y),
@@ -709,7 +715,20 @@ namespace PredatorControlApp
 
             _switchStartWithWindows.CheckedChanged += (s, e) =>
             {
-                SetStartupEnabled(_switchStartWithWindows.Checked);
+                if (_suppressStartupToggle) return;
+
+                bool wanted = _switchStartWithWindows.Checked;
+                if (SetStartupEnabled(wanted) && IsStartupEnabled() == wanted) return;
+
+                _suppressStartupToggle = true;
+                _switchStartWithWindows.Checked = !wanted;
+                _suppressStartupToggle = false;
+
+                MessageBox.Show(this,
+                    wanted
+                        ? "Could not register Predator Control to start with Windows.\r\n\r\nThe scheduled task could not be created. Try running the app as administrator."
+                        : "Could not remove the Predator Control startup task.",
+                    "Start with Windows", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             };
 
             y += switchH + S(28);
@@ -1708,34 +1727,129 @@ namespace PredatorControlApp
             }
         }
 
+        private const string StartupTaskName = "PredatorControl";
+
         private static bool IsStartupEnabled()
+        {
+            return RunSchtasks($"/Query /TN \"{StartupTaskName}\"") == 0;
+        }
+
+        private static bool SetStartupEnabled(bool enable)
+        {
+            RemoveLegacyRunKey();
+
+            if (!enable)
+                return RunSchtasks($"/Delete /TN \"{StartupTaskName}\" /F") == 0 || !IsStartupEnabled();
+
+            string xmlPath = Path.Combine(Path.GetTempPath(), "PredatorControlStartup.xml");
+            try
+            {
+                File.WriteAllText(xmlPath, BuildStartupTaskXml(), Encoding.Unicode);
+                return RunSchtasks($"/Create /TN \"{StartupTaskName}\" /XML \"{xmlPath}\" /F") == 0;
+            }
+            catch { return false; }
+            finally
+            {
+                try { File.Delete(xmlPath); } catch { }
+            }
+        }
+
+        private static string BuildStartupTaskXml()
+        {
+            string user = System.Security.SecurityElement.Escape(WindowsIdentity.GetCurrent().Name);
+            string exe = System.Security.SecurityElement.Escape(Application.ExecutablePath);
+
+            return $@"<?xml version=""1.0"" encoding=""UTF-16""?>
+<Task version=""1.2"" xmlns=""http://schemas.microsoft.com/windows/2004/02/mit/task"">
+  <RegistrationInfo>
+    <Description>Starts Predator Control at logon with administrator rights.</Description>
+  </RegistrationInfo>
+  <Triggers>
+    <LogonTrigger>
+      <Enabled>true</Enabled>
+      <UserId>{user}</UserId>
+      <Delay>PT15S</Delay>
+    </LogonTrigger>
+  </Triggers>
+  <Principals>
+    <Principal id=""Author"">
+      <UserId>{user}</UserId>
+      <LogonType>InteractiveToken</LogonType>
+      <RunLevel>HighestAvailable</RunLevel>
+    </Principal>
+  </Principals>
+  <Settings>
+    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
+    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
+    <AllowHardTerminate>false</AllowHardTerminate>
+    <StartWhenAvailable>false</StartWhenAvailable>
+    <RunOnlyIfNetworkAvailable>false</RunOnlyIfNetworkAvailable>
+    <IdleSettings>
+      <StopOnIdleEnd>false</StopOnIdleEnd>
+      <RestartOnIdle>false</RestartOnIdle>
+    </IdleSettings>
+    <AllowStartOnDemand>true</AllowStartOnDemand>
+    <Enabled>true</Enabled>
+    <Hidden>false</Hidden>
+    <RunOnlyIfIdle>false</RunOnlyIfIdle>
+    <WakeToRun>false</WakeToRun>
+    <ExecutionTimeLimit>PT0S</ExecutionTimeLimit>
+    <Priority>7</Priority>
+  </Settings>
+  <Actions Context=""Author"">
+    <Exec>
+      <Command>{exe}</Command>
+      <Arguments>-hidden</Arguments>
+    </Exec>
+  </Actions>
+</Task>";
+        }
+
+        private static int RunSchtasks(string args)
         {
             try
             {
-                using var key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", false);
-                return key?.GetValue("PredatorControl") != null;
+                using var p = Process.Start(new ProcessStartInfo
+                {
+                    FileName = "schtasks.exe",
+                    Arguments = args,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
+                });
+                if (p == null) return -1;
+                p.WaitForExit(15000);
+                return p.HasExited ? p.ExitCode : -1;
             }
-            catch { return false; }
+            catch { return -1; }
         }
 
-        private static void SetStartupEnabled(bool enable)
+        private static void RemoveLegacyRunKey()
         {
             try
             {
                 using var key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", true);
-                if (key == null) return;
-
-                if (enable)
-                {
-                    string exePath = Application.ExecutablePath;
-                    key.SetValue("PredatorControl", $"\"{exePath}\" -hidden");
-                }
-                else
-                {
-                    key.DeleteValue("PredatorControl", false);
-                }
+                key?.DeleteValue(StartupTaskName, false);
             }
             catch { }
+        }
+
+        private static void MigrateLegacyStartup()
+        {
+            bool hadLegacy;
+            try
+            {
+                using var key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", false);
+                hadLegacy = key?.GetValue(StartupTaskName) != null;
+            }
+            catch { return; }
+
+            if (hadLegacy && !IsStartupEnabled())
+                SetStartupEnabled(true);
+            else if (hadLegacy)
+                RemoveLegacyRunKey();
         }
 
         #endregion
