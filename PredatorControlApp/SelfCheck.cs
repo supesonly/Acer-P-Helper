@@ -28,6 +28,11 @@ namespace PredatorControlApp
             Debug.Assert(Form1.AcProfileValues.Length == 5, "AC table size");
             Debug.Assert(Form1.AcProfileValues[4] == 0x05, "AC Turbo must map to 0x05");
 
+            Debug.Assert(Form1.CurveStepReached(-1, 40), "first curve write must always go out");
+            Debug.Assert(!Form1.CurveStepReached(40, 42), "small jitter must not write");
+            Debug.Assert(Form1.CurveStepReached(40, 45), "a full step must write");
+            Debug.Assert(Form1.CurveStepReached(40, 35), "a full step down must write");
+
             CheckPowerLineDebounce();
         }
 
