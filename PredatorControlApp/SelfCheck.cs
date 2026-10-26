@@ -71,20 +71,23 @@ namespace PredatorControlApp
 
             using var doc = System.Text.Json.JsonDocument.Parse("""
                 {"assets":[
-                    {"name":"PredatorControl-standalone-win-x64.exe","browser_download_url":"http://x/big.exe"},
-                    {"name":"PredatorControl-win-x64.exe","browser_download_url":"http://x/light.exe"}]}
+                    {"name":"PredatorControl-standalone-win-x64.exe","browser_download_url":"http://x/big.exe","digest":"sha256:aa"},
+                    {"name":"PredatorControl-win-x64.exe","browser_download_url":"http://x/light.exe","digest":"sha256:bb"}]}
                 """);
             var rel = doc.RootElement;
-            Debug.Assert(Updater.PickAsset(rel, true) == "http://x/big.exe", "self-contained build must take the standalone asset");
-            Debug.Assert(Updater.PickAsset(rel, false) == "http://x/light.exe", "framework-dependent build must take the light asset");
+            Debug.Assert(Updater.PickAsset(rel, true) == ("http://x/big.exe", "aa"), "self-contained build must take the standalone asset");
+            Debug.Assert(Updater.PickAsset(rel, false) == ("http://x/light.exe", "bb"), "framework-dependent build must take the light asset");
 
             using var noMatch = System.Text.Json.JsonDocument.Parse("""
-                {"assets":[{"name":"only-light.exe","browser_download_url":"http://x/only.exe"}]}
+                {"assets":[{"name":"only-light.exe","browser_download_url":"http://x/only.exe","digest":"sha256:cc"}]}
                 """);
-            Debug.Assert(Updater.PickAsset(noMatch.RootElement, true) == "http://x/only.exe", "must fall back to any .exe");
+            Debug.Assert(Updater.PickAsset(noMatch.RootElement, true) == ("http://x/only.exe", "cc"), "must fall back to any .exe");
 
-            using var none = System.Text.Json.JsonDocument.Parse("""{"assets":[{"name":"notes.txt","browser_download_url":"http://x/n"}]}""");
+            using var none = System.Text.Json.JsonDocument.Parse("""{"assets":[{"name":"notes.txt","browser_download_url":"http://x/n","digest":"sha256:dd"}]}""");
             Debug.Assert(Updater.PickAsset(none.RootElement, true) == null, "non-exe assets must be ignored");
+
+            using var noDigest = System.Text.Json.JsonDocument.Parse("""{"assets":[{"name":"a.exe","browser_download_url":"http://x/a.exe"}]}""");
+            Debug.Assert(Updater.PickAsset(noDigest.RootElement, true) == null, "assets without a sha256 digest must be ignored");
 
             string plain = Updater.Plain("## What's new\r\n\r\n**Bold.** text\r\n\r\n\r\n- one\r\n* two\r\n\r\n`code` and [link](http://x)");
             Debug.Assert(!plain.Contains('#') && !plain.Contains('*') && !plain.Contains('`'), "markdown syntax must be stripped");

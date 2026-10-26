@@ -3,6 +3,7 @@ using System.Net.Http;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -10,7 +11,7 @@ using Microsoft.Win32;
 
 namespace PredatorControlApp
 {
-    internal sealed record UpdateInfo(Version Version, string Tag, string Notes, string DownloadUrl);
+    internal sealed record UpdateInfo(Version Version, string Tag, string Notes, string DownloadUrl, string Sha256);
 
     [SupportedOSPlatform("windows")]
     internal static class Updater
@@ -61,8 +62,8 @@ namespace PredatorControlApp
                      .AppendLine(Str(rel, "body").Trim().Replace("\r\n", "\n").Replace("\n", Environment.NewLine))
                      .AppendLine();
 
-                if (newest == null && PickAsset(rel, IsSelfContained) is string url)
-                    newest = new UpdateInfo(v, Str(rel, "tag_name"), "", url);
+                if (newest == null && PickAsset(rel, IsSelfContained) is (string url, string sha256))
+                    newest = new UpdateInfo(v, Str(rel, "tag_name"), "", url, sha256);
             }
 
             return newest == null ? null : newest with { Notes = notes.ToString().TrimEnd() };
@@ -77,11 +78,11 @@ namespace PredatorControlApp
         private static bool IsSelfContained =>
             !RuntimeEnvironment.GetRuntimeDirectory().Replace('/', '\\').Contains(@"\dotnet\shared\", OIC);
 
-        internal static string? PickAsset(JsonElement rel, bool wantSelfContained)
+        internal static (string Url, string Sha256)? PickAsset(JsonElement rel, bool wantSelfContained)
         {
             if (!rel.TryGetProperty("assets", out var assets) || assets.ValueKind != JsonValueKind.Array) return null;
 
-            string? fallback = null;
+            (string, string)? fallback = null;
             foreach (var a in assets.EnumerateArray())
             {
                 string name = Str(a, "name");
@@ -90,9 +91,13 @@ namespace PredatorControlApp
                 string url = Str(a, "browser_download_url");
                 if (url.Length == 0) continue;
 
+                string digest = Str(a, "digest");
+                if (!digest.StartsWith("sha256:", OIC)) continue;
+                string sha256 = digest["sha256:".Length..];
+
                 bool selfContained = name.Contains("standalone", OIC) || name.Contains("self", OIC);
-                if (selfContained == wantSelfContained) return url;
-                fallback ??= url;
+                if (selfContained == wantSelfContained) return (url, sha256);
+                fallback ??= (url, sha256);
             }
             return fallback;
         }
@@ -104,7 +109,8 @@ namespace PredatorControlApp
         internal static async Task ApplyAsync(UpdateInfo info)
         {
             string target = Environment.ProcessPath ?? Application.ExecutablePath;
-            string staged = Path.Combine(Path.GetTempPath(), "PredatorControl-update.exe");
+            string stageDir = Directory.CreateTempSubdirectory("PredatorControl-update-").FullName;
+            string staged = Path.Combine(stageDir, "PredatorControl.exe");
 
             using (var http = new HttpClient { Timeout = TimeSpan.FromMinutes(10) })
             {
@@ -114,8 +120,15 @@ namespace PredatorControlApp
                 await src.CopyToAsync(dst);
             }
 
-            if (new FileInfo(staged).Length < 100_000)
-                throw new IOException("Downloaded file looks truncated.");
+            string actual;
+            using (var fs = File.OpenRead(staged))
+                actual = Convert.ToHexString(await SHA256.HashDataAsync(fs));
+
+            if (!actual.Equals(info.Sha256, OIC))
+            {
+                Directory.Delete(stageDir, true);
+                throw new IOException("Downloaded update does not match the release checksum. Update cancelled.");
+            }
 
             try
             {
@@ -126,7 +139,7 @@ namespace PredatorControlApp
             catch { }
 
             int pid = Environment.ProcessId;
-            string script = Path.Combine(Path.GetTempPath(), "PredatorControl-update.cmd");
+            string script = Path.Combine(stageDir, "update.cmd");
             File.WriteAllText(script, $"""
                 @echo off
                 chcp 65001 >nul
@@ -138,7 +151,7 @@ namespace PredatorControlApp
                 )
                 move /y "{staged}" "{target}" >nul
                 start "" "{target}"
-                (goto) 2>nul & del "%~f0"
+                (goto) 2>nul & rmdir /s /q "{stageDir}"
                 """, new UTF8Encoding(false));
 
             Process.Start(new ProcessStartInfo("cmd.exe", $"/c \"{script}\"")
