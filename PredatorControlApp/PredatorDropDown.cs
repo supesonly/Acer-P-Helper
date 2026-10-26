@@ -14,6 +14,7 @@ namespace PredatorControlApp
         private int _selectedIndex = -1;
         private readonly List<string> _items = new();
         private Form? _popup;
+        private Form? _owner;
         private ListBox? _listBox;
         private int _hoverIndex = -1;
 
@@ -57,7 +58,7 @@ namespace PredatorControlApp
                 ControlStyles.OptimizedDoubleBuffer |
                 ControlStyles.ResizeRedraw, true);
 
-            Font = new Font("Segoe UI", 9.25f, FontStyle.Regular);
+            Font = new Font(Loc.UiFont, 9.25f, FontStyle.Regular);
             Size = new Size(180, 34);
             Cursor = Cursors.Hand;
         }
@@ -94,7 +95,7 @@ namespace PredatorControlApp
                 g.DrawPath(pen, path);
 
             string displayText = SelectedText;
-            if (string.IsNullOrEmpty(displayText)) displayText = "Select...";
+            if (string.IsNullOrEmpty(displayText)) displayText = Loc.T("Select...");
             var textRect = new Rectangle(12, 0, Width - 36, Height);
             TextRenderer.DrawText(g, displayText, Font, textRect, TextNormal,
                 TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
@@ -191,8 +192,18 @@ namespace PredatorControlApp
             _popup = popup;
             _listBox = listBox;
 
-            popup.Show(this.FindForm()!);
+            // Keep the list under the box when the page scrolls or the window moves.
+            _owner = this.FindForm()!;
+            LocationChanged += PlacePopup;
+            _owner.LocationChanged += PlacePopup;
+
+            popup.Show(_owner);
             listBox.Focus();
+        }
+
+        private void PlacePopup(object? sender, EventArgs e)
+        {
+            if (_popup != null) _popup.Location = PointToScreen(new Point(0, Height));
         }
 
         private void ClosePopup()
@@ -204,6 +215,10 @@ namespace PredatorControlApp
             {
                 _isOpen = false;
                 Invalidate();
+
+                LocationChanged -= PlacePopup;
+                if (_owner != null) _owner.LocationChanged -= PlacePopup;
+                _owner = null;
 
                 var popup = _popup;
                 _popup = null;

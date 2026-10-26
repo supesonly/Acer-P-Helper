@@ -16,9 +16,9 @@ namespace PredatorControlApp
         private static readonly Color AccentColor = Color.FromArgb(0, 200, 160);
         private static readonly Color TextColor = Color.FromArgb(210, 210, 215);
 
-        private static readonly Font FontTitle = new("Segoe UI", 11f, FontStyle.Bold);
-        private static readonly Font FontSection = new("Segoe UI", 8.5f, FontStyle.Bold);
-        private static readonly Font FontBody = new("Segoe UI", 9.5f, FontStyle.Regular);
+        private static readonly Font FontTitle = new(Loc.UiFont, 11f, FontStyle.Bold);
+        private static readonly Font FontSection = new(Loc.UiFont, 8.5f, FontStyle.Bold);
+        private static readonly Font FontBody = new(Loc.UiFont, 9.5f, FontStyle.Regular);
 
         #endregion
 
@@ -44,11 +44,11 @@ namespace PredatorControlApp
 
         private GameProfile? _editingProfile;
 
-        private static readonly string[] PowerModeNames = { "Quiet", "Balanced", "Performance", "Turbo", "Eco" };
+        private static readonly string[] PowerModeNames = { Loc.T("Quiet"), Loc.T("Balanced"), Loc.T("Performance"), Loc.T("Turbo"), Loc.T("Eco") };
         private static readonly byte[] PowerModeValues = { 0x00, 0x01, 0x04, 0x05, 0x06 };
-        private static readonly string[] FanModeNames = { "Auto", "Max", "Custom" };
+        private static readonly string[] FanModeNames = { Loc.T("Auto"), Loc.T("Max"), Loc.T("Custom") };
         private static readonly byte[] FanModeValues = { 0x01, 0x02, 0x03 };
-        private static readonly string[] RgbModeNames = { "Don't Change", "Static", "Breathing", "Neon", "Wave", "Shifting", "Zoom", "Meteor", "Twinkling" };
+        private static readonly string[] RgbModeNames = { Loc.T("Don't Change"), Loc.T("Static"), Loc.T("Breathing"), Loc.T("Neon"), Loc.T("Wave"), Loc.T("Shifting"), Loc.T("Zoom"), Loc.T("Meteor"), Loc.T("Twinkling") };
 
         #endregion
 
@@ -59,7 +59,7 @@ namespace PredatorControlApp
             _controller = controller;
             _maxHz = maxHz;
 
-            this.Text = "Game Sync Configuration";
+            this.Text = Loc.T("Game Sync Configuration");
             this.FormBorderStyle = FormBorderStyle.None;
             this.StartPosition = FormStartPosition.CenterParent;
             this.BackColor = FormBg;
@@ -101,7 +101,7 @@ namespace PredatorControlApp
             pnlTitle.MouseDown += TitleBar_MouseDown;
             this.Controls.Add(pnlTitle);
 
-            var lblTitle = new Label { Text = "🎮  Game Sync Configuration", Font = FontTitle, ForeColor = TextColor, AutoSize = true, Location = new Point(pad, 11), BackColor = Color.Transparent };
+            var lblTitle = new Label { Text = Loc.T("🎮  Game Sync Configuration"), Font = FontTitle, ForeColor = TextColor, AutoSize = true, Location = new Point(pad, 11), BackColor = Color.Transparent };
             lblTitle.MouseDown += TitleBar_MouseDown;
             pnlTitle.Controls.Add(lblTitle);
 
@@ -116,7 +116,7 @@ namespace PredatorControlApp
             int listW = 220;
             int listAreaH = this.ClientSize.Height - contentY - bottomPad;
 
-            MakeLabel("CONFIGURED APPS", pad, contentY, FontSection, HeaderColor);
+            MakeLabel(Loc.T("CONFIGURED APPS"), pad, contentY, FontSection, HeaderColor);
 
             int btnAddH = 34;
             int listH = listAreaH - 26 - (btnAddH * 3) - 28; 
@@ -139,7 +139,7 @@ namespace PredatorControlApp
             _btnAdd = MakeButton("\uff0b  Browse for .exe", pad, _lstProfiles.Bottom + 8, listW, btnAddH);
             _btnAdd.Click += BtnAdd_Click;
 
-            var btnPick = MakeButton("⚡  Pick Running Process", pad, _lstProfiles.Bottom + 8 + btnAddH + 6, listW, btnAddH);
+            var btnPick = MakeButton(Loc.T("⚡  Pick Running Process"), pad, _lstProfiles.Bottom + 8 + btnAddH + 6, listW, btnAddH);
             btnPick.Click += BtnPickRunning_Click;
 
             int editorX = pad + listW + pad;
@@ -157,7 +157,7 @@ namespace PredatorControlApp
 
             var lblEmpty = new Label
             {
-                Text = "Select an application from the list\nor add a new one to get started.",
+                Text = Loc.T("Select an application from the list\nor add a new one to get started."),
                 ForeColor = SubHeaderColor,
                 Font = FontBody,
                 TextAlign = ContentAlignment.MiddleCenter,
@@ -176,19 +176,19 @@ namespace PredatorControlApp
             _pnlEditor.Controls.Add(new Panel { Location = new Point(0, ey), Size = new Size(editorW, 1), BackColor = BorderColor });
             ey += 20;
 
-            MakeLabelIn(_pnlEditor, "POWER MODE", 0, ey, FontSection, HeaderColor);
+            MakeLabelIn(_pnlEditor, Loc.T("POWER MODE"), 0, ey, FontSection, HeaderColor);
             ey += 24;
             _cboPower = MakeComboIn(_pnlEditor, PowerModeNames, 0, ey, editorW);
             ey += sectionGap;
 
-            MakeLabelIn(_pnlEditor, "FAN MODE", 0, ey, FontSection, HeaderColor);
+            MakeLabelIn(_pnlEditor, Loc.T("FAN MODE"), 0, ey, FontSection, HeaderColor);
             ey += 24;
             _cboFan = MakeComboIn(_pnlEditor, FanModeNames, 0, ey, editorW);
             ey += sectionGap;
 
             int sliderW = (editorW - 12) / 2;
-            _lblCpuFanHdr = MakeLabelIn(_pnlEditor, "CPU FAN: 50%", 0, ey, FontSection, HeaderColor);
-            _lblGpuFanHdr = MakeLabelIn(_pnlEditor, "GPU FAN: 50%", sliderW + 12, ey, FontSection, HeaderColor);
+            _lblCpuFanHdr = MakeLabelIn(_pnlEditor, Loc.F("CPU FAN: {0}%", 50), 0, ey, FontSection, HeaderColor);
+            _lblGpuFanHdr = MakeLabelIn(_pnlEditor, Loc.F("GPU FAN: {0}%", 50), sliderW + 12, ey, FontSection, HeaderColor);
             ey += 22;
             _trkCpuFan = new PredatorSlider
             {
@@ -204,8 +204,8 @@ namespace PredatorControlApp
             };
             _pnlEditor.Controls.Add(_trkCpuFan);
             _pnlEditor.Controls.Add(_trkGpuFan);
-            _trkCpuFan.ValueChanged += (s, e) => _lblCpuFanHdr.Text = $"CPU FAN: {_trkCpuFan.Value}%";
-            _trkGpuFan.ValueChanged += (s, e) => _lblGpuFanHdr.Text = $"GPU FAN: {_trkGpuFan.Value}%";
+            _trkCpuFan.ValueChanged += (s, e) => _lblCpuFanHdr.Text = Loc.F("CPU FAN: {0}%", _trkCpuFan.Value);
+            _trkGpuFan.ValueChanged += (s, e) => _lblGpuFanHdr.Text = Loc.F("GPU FAN: {0}%", _trkGpuFan.Value);
             ey += sectionGap;
 
             _lblCpuFanHdr.Visible = false;
@@ -221,26 +221,26 @@ namespace PredatorControlApp
                 _trkGpuFan.Visible = isCustom;
             };
 
-            MakeLabelIn(_pnlEditor, "REFRESH RATE", 0, ey, FontSection, HeaderColor);
+            MakeLabelIn(_pnlEditor, Loc.T("REFRESH RATE"), 0, ey, FontSection, HeaderColor);
             ey += 24;
-            _cboRefresh = MakeComboIn(_pnlEditor, new[] { "Don't Change", "60 Hz", $"{_maxHz} Hz (Max)" }, 0, ey, editorW);
+            _cboRefresh = MakeComboIn(_pnlEditor, new[] { Loc.T("Don't Change"), "60 Hz", Loc.F("{0} Hz (Max)", _maxHz) }, 0, ey, editorW);
             ey += sectionGap;
 
-            MakeLabelIn(_pnlEditor, "BATTERY CHARGE LIMIT", 0, ey, FontSection, HeaderColor);
+            MakeLabelIn(_pnlEditor, Loc.T("BATTERY CHARGE LIMIT"), 0, ey, FontSection, HeaderColor);
             ey += 24;
-            _cboBattery = MakeComboIn(_pnlEditor, new[] { "Don't Change", "Full Charge (100%)", "Limit to 80% (Health)" }, 0, ey, editorW);
+            _cboBattery = MakeComboIn(_pnlEditor, new[] { Loc.T("Don't Change"), Loc.T("Full Charge (100%)"), Loc.T("Limit to 80% (Health)") }, 0, ey, editorW);
             ey += sectionGap;
 
-            MakeLabelIn(_pnlEditor, "RGB KEYBOARD", 0, ey, FontSection, HeaderColor);
+            MakeLabelIn(_pnlEditor, Loc.T("RGB KEYBOARD"), 0, ey, FontSection, HeaderColor);
             ey += 24;
             _cboRgbMode = MakeComboIn(_pnlEditor, RgbModeNames, 0, ey, editorW);
             ey += sectionGap;
 
             int halfW = (editorW - 20) / 2;
 
-            MakeLabelIn(_pnlEditor, "BRIGHTNESS", 0, ey, FontSection, HeaderColor);
+            MakeLabelIn(_pnlEditor, Loc.T("BRIGHTNESS"), 0, ey, FontSection, HeaderColor);
             _lblBrightVal = MakeLabelIn(_pnlEditor, "100%", halfW - 40, ey, FontBody, SubHeaderColor);
-            MakeLabelIn(_pnlEditor, "EFFECT SPEED", halfW + 20, ey, FontSection, HeaderColor);
+            MakeLabelIn(_pnlEditor, Loc.T("EFFECT SPEED"), halfW + 20, ey, FontSection, HeaderColor);
             _lblSpeedVal = MakeLabelIn(_pnlEditor, "50%", editorW - 40, ey, FontBody, SubHeaderColor);
             ey += 24;
 
@@ -250,10 +250,10 @@ namespace PredatorControlApp
             _trkSpeed.ValueChanged += (s, e) => _lblSpeedVal.Text = $"{_trkSpeed.Value}%";
             ey += sectionGap;
 
-            MakeLabelIn(_pnlEditor, "COLOR CUSTOMIZATION", 0, ey, FontSection, HeaderColor);
+            MakeLabelIn(_pnlEditor, Loc.T("COLOR CUSTOMIZATION"), 0, ey, FontSection, HeaderColor);
             ey += 24;
 
-            _btnColorPick = new PredatorButton { Text = "    Choose Custom Color", Location = new Point(0, ey), Size = new Size(editorW, 36) };
+            _btnColorPick = new PredatorButton { Text = Loc.T("    Choose Custom Color"), Location = new Point(0, ey), Size = new Size(editorW, 36) };
             _btnColorPick.Paint += (s, pe) =>
             {
                 var g = pe.Graphics;
@@ -279,11 +279,11 @@ namespace PredatorControlApp
             ey += sectionGap;
 
             int btnW = (editorW - 16) / 2;
-            _btnSave = new PredatorButton { Text = "💾  Save Profile", Location = new Point(0, ey), Size = new Size(btnW, 38) };
+            _btnSave = new PredatorButton { Text = Loc.T("💾  Save Profile"), Location = new Point(0, ey), Size = new Size(btnW, 38) };
             _pnlEditor.Controls.Add(_btnSave);
             _btnSave.Click += BtnSave_Click;
 
-            _btnRemove = new PredatorButton { Text = "🗑  Remove", Location = new Point(btnW + 12, ey), Size = new Size(btnW, 38) };
+            _btnRemove = new PredatorButton { Text = Loc.T("🗑  Remove"), Location = new Point(btnW + 12, ey), Size = new Size(btnW, 38) };
             _pnlEditor.Controls.Add(_btnRemove);
             _btnRemove.Click += BtnRemove_Click;
         }
@@ -409,8 +409,8 @@ namespace PredatorControlApp
             bool isCustomFan = p.FanMode == 0x03;
             _trkCpuFan.Value = p.CpuFanSpeed >= 10 ? Math.Clamp(p.CpuFanSpeed, 10, 100) : 50;
             _trkGpuFan.Value = p.GpuFanSpeed >= 10 ? Math.Clamp(p.GpuFanSpeed, 10, 100) : 50;
-            _lblCpuFanHdr.Text = $"CPU FAN: {_trkCpuFan.Value}%";
-            _lblGpuFanHdr.Text = $"GPU FAN: {_trkGpuFan.Value}%";
+            _lblCpuFanHdr.Text = Loc.F("CPU FAN: {0}%", _trkCpuFan.Value);
+            _lblGpuFanHdr.Text = Loc.F("GPU FAN: {0}%", _trkGpuFan.Value);
             _lblCpuFanHdr.Visible = isCustomFan;
             _lblGpuFanHdr.Visible = isCustomFan;
             _trkCpuFan.Visible = isCustomFan;
@@ -483,7 +483,7 @@ namespace PredatorControlApp
             {
                 using var ofd = new OpenFileDialog
                 {
-                    Title = "Select an Application",
+                    Title = Loc.T("Select an Application"),
                     Filter = "Executables (*.exe)|*.exe",
                     CheckFileExists = true
                 };
@@ -498,8 +498,8 @@ namespace PredatorControlApp
             catch
             {
                 MessageBox.Show(this,
-                    "Could not browse to that location.\n\nYou can find the process name in Task Manager while the game is running, and use 'Pick Running Process' to add it.",
-                    "Browse Failed", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    Loc.T("Could not browse to that location.\n\nYou can find the process name in Task Manager while the game is running, and use 'Pick Running Process' to add it."),
+                    Loc.T("Browse Failed"), MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
         }
 
@@ -541,7 +541,7 @@ namespace PredatorControlApp
 
             if (allProcs.Count == 0)
             {
-                MessageBox.Show(this, "No running processes found.", "Pick Process",
+                MessageBox.Show(this, Loc.T("No running processes found."), Loc.T("Pick Process"),
                     MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
@@ -551,8 +551,8 @@ namespace PredatorControlApp
             var dlgBorder= Color.FromArgb(55, 55, 62);
             var dlgText  = Color.FromArgb(210, 210, 215);
             var dlgSub   = Color.FromArgb(140, 140, 150);
-            var titleFont= new Font("Segoe UI", 10f, FontStyle.Bold);
-            var bodyFont = new Font("Segoe UI", 9.25f);
+            var titleFont= new Font(Loc.UiFont, 10f, FontStyle.Bold);
+            var bodyFont = new Font(Loc.UiFont, 9.25f);
 
             using var dlg = new Form
             {
@@ -573,7 +573,7 @@ namespace PredatorControlApp
 
             var lblTitle = new Label
             {
-                Text = "Pick a Running Process",
+                Text = Loc.T("Pick a Running Process"),
                 Font = titleFont, ForeColor = dlgText, AutoSize = true,
                 Location = new Point(14, 11), BackColor = Color.Transparent
             };
@@ -608,7 +608,7 @@ namespace PredatorControlApp
                 Location = new Point(1, 1), Size = new Size(330, 28),
                 BackColor = Color.FromArgb(28, 28, 32), ForeColor = dlgText,
                 Font = bodyFont, BorderStyle = BorderStyle.None,
-                PlaceholderText = "Search..."
+                PlaceholderText = Loc.T("Search...")
             };
             pnlSearch.Controls.Add(txtSearch);
 
@@ -637,7 +637,7 @@ namespace PredatorControlApp
 
             var btnAdd2 = new PredatorButton
             {
-                Text = "Add Selected", Location = new Point(14, 438), Size = new Size(332, 34)
+                Text = Loc.T("Add Selected"), Location = new Point(14, 438), Size = new Size(332, 34)
             };
             dlg.Controls.Add(btnAdd2);
 
@@ -687,7 +687,7 @@ namespace PredatorControlApp
             {
                 if (existing.ExecutableName.Equals(exeName, StringComparison.OrdinalIgnoreCase))
                 {
-                    MessageBox.Show(this, $"\"{exeName}\" is already configured.", "Duplicate", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    MessageBox.Show(this, Loc.F("\"{0}\" is already configured.", exeName), Loc.T("Duplicate"), MessageBoxButtons.OK, MessageBoxIcon.Information);
                     return;
                 }
             }
@@ -731,8 +731,8 @@ namespace PredatorControlApp
             if (_editingProfile == null) return;
 
             var result = MessageBox.Show(this,
-                $"Remove \"{_editingProfile.ExecutableName}\" from Game Sync?",
-                "Confirm Remove", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+                Loc.F("Remove \"{0}\" from Game Sync?", _editingProfile.ExecutableName),
+                Loc.T("Confirm Remove"), MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
 
             if (result == DialogResult.Yes)
             {

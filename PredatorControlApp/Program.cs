@@ -33,7 +33,7 @@ namespace PredatorControlApp
             try
             {
                 MessageBox.Show(
-                    $"{(fatal ? "Fatal" : "Error")}: {ex.Message}\n\nLogged to:\n{LogPath}",
+                    Loc.F("{0}: {1}\n\nLogged to:\n{2}", fatal ? Loc.T("Fatal") : Loc.T("Error"), ex.Message, LogPath),
                     "Predator Control", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             catch { }

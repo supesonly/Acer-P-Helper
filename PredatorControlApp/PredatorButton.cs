@@ -45,7 +45,7 @@ namespace PredatorControlApp
                 ControlStyles.OptimizedDoubleBuffer |
                 ControlStyles.ResizeRedraw, true);
 
-            Font = new Font("Segoe UI", 9.25f, FontStyle.Regular);
+            Font = new Font(Loc.UiFont, 9.25f, FontStyle.Regular);
             Size = new Size(96, 40);
             Cursor = Cursors.Hand;
         }

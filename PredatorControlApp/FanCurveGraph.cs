@@ -42,7 +42,7 @@ namespace PredatorControlApp
         private List<Point> _points;
         private Color _curveColor = Color.FromArgb(0, 180, 255);
         private int _currentTemp;
-        private string _fanLabel = "FAN CURVE";
+        private string _fanLabel = Loc.T("FAN CURVE");
         private int _dragIndex = -1;
         private int _hoverIndex = -1;
 
@@ -202,7 +202,7 @@ namespace PredatorControlApp
 
         private void DrawAxisLabels(Graphics g, RectangleF area)
         {
-            using var font = new Font("Segoe UI", 7.5f);
+            using var font = new Font(Loc.UiFont, 7.5f);
             using var brush = new SolidBrush(LabelColor);
             using var sfCenter = new StringFormat { Alignment = StringAlignment.Center };
             using var sfRight = new StringFormat
@@ -226,7 +226,7 @@ namespace PredatorControlApp
 
         private void DrawTitle(Graphics g, RectangleF area)
         {
-            using var font = new Font("Segoe UI", 8.5f, FontStyle.Bold);
+            using var font = new Font(Loc.UiFont, 8.5f, FontStyle.Bold);
             using var brush = new SolidBrush(_curveColor);
             g.DrawString(_fanLabel, font, brush, area.Left, area.Top - 22);
         }
@@ -236,7 +236,7 @@ namespace PredatorControlApp
             int speed = InterpolateSpeed(_currentTemp);
             string status = $"{_currentTemp}°C → {speed}%";
 
-            using var font = new Font("Segoe UI", 8f);
+            using var font = new Font(Loc.UiFont, 8f);
             using var brush = new SolidBrush(_curveColor);
             using var sf = new StringFormat { Alignment = StringAlignment.Far };
             g.DrawString(status, font, brush, area.Right, area.Top - 22, sf);
@@ -324,7 +324,7 @@ namespace PredatorControlApp
             var px = CurvePointToPixel(pt);
             string text = $"{pt.X}°C, {pt.Y}%";
 
-            using var font = new Font("Segoe UI", 7.5f);
+            using var font = new Font(Loc.UiFont, 7.5f);
             var sz = g.MeasureString(text, font);
 
             float tx = px.X - sz.Width / 2;

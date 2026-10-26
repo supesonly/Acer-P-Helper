@@ -29,7 +29,7 @@ namespace PredatorControlApp
         private static readonly Color FlashGreen = Color.FromArgb(0, 180, 80);
         private static readonly Color FlashRed = Color.FromArgb(220, 50, 50);
 
-        private static readonly Font FontTitle = new("Segoe UI", 10f, FontStyle.Bold);
+        private static readonly Font FontTitle = new(Loc.UiFont, 10f, FontStyle.Bold);
 
         #endregion
 
@@ -81,7 +81,7 @@ namespace PredatorControlApp
 
         public FanCurveForm()
         {
-            Text = "Fan Curve Editor";
+            Text = Loc.T("Fan Curve Editor");
             FormBorderStyle = FormBorderStyle.None;
             StartPosition = FormStartPosition.CenterParent;
             BackColor = FormBg;
@@ -122,7 +122,7 @@ namespace PredatorControlApp
 
             var lblTitle = new Label
             {
-                Text = "Fan Curve Editor",
+                Text = Loc.T("Fan Curve Editor"),
                 Font = FontTitle,
                 ForeColor = TitleTextColor,
                 AutoSize = true,
@@ -135,7 +135,7 @@ namespace PredatorControlApp
             var lblClose = new Label
             {
                 Text = "✕",
-                Font = new Font("Segoe UI", 10f, FontStyle.Bold),
+                Font = new Font(Loc.UiFont, 10f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(140, 140, 145),
                 AutoSize = true,
                 Cursor = Cursors.Hand,
@@ -157,7 +157,7 @@ namespace PredatorControlApp
             _graphCpu = new FanCurveGraph
             {
                 CurveColor = CpuCurveColor,
-                FanLabel = "CPU FAN CURVE",
+                FanLabel = Loc.T("CPU FAN CURVE"),
                 Location = new Point(SidePad, y),
                 Size = new Size(ClientSize.Width - SidePad * 2, GraphHeight)
             };
@@ -170,7 +170,7 @@ namespace PredatorControlApp
             _graphGpu = new FanCurveGraph
             {
                 CurveColor = GpuCurveColor,
-                FanLabel = "GPU FAN CURVE",
+                FanLabel = Loc.T("GPU FAN CURVE"),
                 Location = new Point(SidePad, y),
                 Size = new Size(ClientSize.Width - SidePad * 2, GraphHeight)
             };
@@ -186,7 +186,7 @@ namespace PredatorControlApp
 
             _btnReset = new PredatorButton
             {
-                Text = "Reset",
+                Text = Loc.T("Reset"),
                 Size = new Size(btnWidth, btnHeight),
                 Location = new Point(SidePad, btnY)
             };
@@ -195,7 +195,7 @@ namespace PredatorControlApp
 
             _btnApply = new PredatorButton
             {
-                Text = "Apply",
+                Text = Loc.T("Apply"),
                 Size = new Size(btnWidth, btnHeight),
                 Location = new Point(ClientSize.Width - SidePad - btnWidth, btnY)
             };

@@ -28,6 +28,13 @@ namespace PredatorControlApp
             Debug.Assert(Form1.AcProfileValues.Length == 5, "AC table size");
             Debug.Assert(Form1.AcProfileValues[4] == 0x05, "AC Turbo must map to 0x05");
 
+            Debug.Assert(Loc.IsSimplifiedChinese(new System.Globalization.CultureInfo("zh-CN")), "zh-CN must use Chinese");
+            Debug.Assert(!Loc.IsSimplifiedChinese(new System.Globalization.CultureInfo("en-US")), "en-US must stay English");
+            Debug.Assert(!Loc.UseChinese("en", new System.Globalization.CultureInfo("zh-CN")), "English choice must override a Chinese system");
+            Debug.Assert(Loc.UseChinese("zh-Hans", new System.Globalization.CultureInfo("en-US")), "Chinese choice must override an English system");
+            Debug.Assert(!Loc.UseChinese(Loc.Language, System.Globalization.CultureInfo.CurrentUICulture) || Loc.T("Quiet") != "Quiet",
+                "Chinese language must load the translation table");
+
             CheckPowerLineDebounce();
         }
 
