@@ -1247,7 +1247,17 @@ namespace PredatorControlApp
             ApplyPowerMode(profile.PowerMode, PowerByteToBtn(profile.PowerMode));
             ApplyFanMode(profile.FanMode, FanByteToBtn(profile.FanMode));
 
-            if (profile.FanMode == 0x03)
+            if (profile.FanMode == 0x03 && profile.UseFanCurve)
+            {
+                _fanCurveEnabled = true;
+                HighlightBtn(_btnFanCurve, ref _activeCustomSubBtn);
+                _cpuFanSlider.Enabled = false;
+                _gpuFanSlider.Enabled = false;
+                _lastCurveCpuSpeed = -1;
+                _lastCurveGpuSpeed = -1;
+                ApplyFanCurve();
+            }
+            else if (profile.FanMode == 0x03)
             {
                 _fanCurveEnabled = false;
                 HighlightBtn(_btnFixedSpeed, ref _activeCustomSubBtn);

@@ -7,6 +7,7 @@ namespace PredatorControlApp
 
         public byte PowerMode { get; set; } = 0x01;      
         public byte FanMode { get; set; } = 0x01;         
+        public bool UseFanCurve { get; set; }
         public int CpuFanSpeed { get; set; } = -1;         
         public int GpuFanSpeed { get; set; } = -1;
 

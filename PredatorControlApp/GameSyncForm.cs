@@ -46,8 +46,9 @@ namespace PredatorControlApp
 
         private static readonly string[] PowerModeNames = { "Quiet", "Balanced", "Performance", "Turbo", "Eco" };
         private static readonly byte[] PowerModeValues = { 0x00, 0x01, 0x04, 0x05, 0x06 };
-        private static readonly string[] FanModeNames = { "Auto", "Max", "Custom" };
-        private static readonly byte[] FanModeValues = { 0x01, 0x02, 0x03 };
+        private static readonly string[] FanModeNames = { "Auto", "Max", "Custom", "Fan Curve" };
+        private static readonly byte[] FanModeValues = { 0x01, 0x02, 0x03, 0x03 };
+        private const int FanCurveIndex = 3;
         private static readonly string[] RgbModeNames = { "Don't Change", "Static", "Breathing", "Neon", "Wave", "Shifting", "Zoom", "Meteor", "Twinkling" };
 
         #endregion
@@ -403,10 +404,10 @@ namespace PredatorControlApp
             int powerIdx = Array.IndexOf(PowerModeValues, p.PowerMode);
             _cboPower.SelectedIndex = powerIdx >= 0 ? powerIdx : 1;
 
-            int fanIdx = Array.IndexOf(FanModeValues, p.FanMode);
+            int fanIdx = p.UseFanCurve ? FanCurveIndex : Array.IndexOf(FanModeValues, p.FanMode);
             _cboFan.SelectedIndex = fanIdx >= 0 ? fanIdx : 0;
 
-            bool isCustomFan = p.FanMode == 0x03;
+            bool isCustomFan = fanIdx == 2;
             _trkCpuFan.Value = p.CpuFanSpeed >= 10 ? Math.Clamp(p.CpuFanSpeed, 10, 100) : 50;
             _trkGpuFan.Value = p.GpuFanSpeed >= 10 ? Math.Clamp(p.GpuFanSpeed, 10, 100) : 50;
             _lblCpuFanHdr.Text = $"CPU FAN: {_trkCpuFan.Value}%";
@@ -445,6 +446,7 @@ namespace PredatorControlApp
                 DisplayName = _editingProfile?.DisplayName ?? "",
                 PowerMode = PowerModeValues[_cboPower.SelectedIndex],
                 FanMode = FanModeValues[_cboFan.SelectedIndex],
+                UseFanCurve = _cboFan.SelectedIndex == FanCurveIndex,
                 CpuFanSpeed = _cboFan.SelectedIndex == 2 ? _trkCpuFan.Value : -1,
                 GpuFanSpeed = _cboFan.SelectedIndex == 2 ? _trkGpuFan.Value : -1,
             };
