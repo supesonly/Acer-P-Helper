@@ -671,13 +671,13 @@ namespace PredatorControlApp
 
             _cpuFanSlider.ValueCommitted += (s, e) =>
             {
-                _wmi.SetCpuFanSpeed((byte)_cpuFanSlider.Value);
+                _wmi.SetCustomFanSpeed((byte)_cpuFanSlider.Value, (byte)_gpuFanSlider.Value);
                 SaveState("FanSpeedCpu", _cpuFanSlider.Value);
                 SaveFanSpeedForProfile("Cpu", _cpuFanSlider.Value);
             };
             _gpuFanSlider.ValueCommitted += (s, e) =>
             {
-                _wmi.SetGpuFanSpeed((byte)_gpuFanSlider.Value);
+                _wmi.SetCustomFanSpeed((byte)_cpuFanSlider.Value, (byte)_gpuFanSlider.Value);
                 SaveState("FanSpeedGpu", _gpuFanSlider.Value);
                 SaveFanSpeedForProfile("Gpu", _gpuFanSlider.Value);
             };
@@ -703,8 +703,7 @@ namespace PredatorControlApp
                 _cpuFanSlider.Enabled = true;
                 _gpuFanSlider.Enabled = true;
 
-                _wmi.SetCpuFanSpeed((byte)_cpuFanSlider.Value);
-                _wmi.SetGpuFanSpeed((byte)_gpuFanSlider.Value);
+                _wmi.SetCustomFanSpeed((byte)_cpuFanSlider.Value, (byte)_gpuFanSlider.Value);
             };
 
             _btnFanCurve.Click += (s, e) =>

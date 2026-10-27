@@ -146,6 +146,14 @@ namespace PredatorControlApp
             return cpuOk && gpuOk;
         }
 
+        // The EC ignores SetGamingFanSpeed while the fan behavior is Auto, so set Custom first.
+        public void SetCustomFanSpeed(byte cpuSpeed, byte gpuSpeed)
+        {
+            _customCpuFanSpeed = cpuSpeed;
+            _customGpuFanSpeed = gpuSpeed;
+            SetFanBehavior(0x03);
+        }
+
         public bool SetCpuFanSpeed(byte speed)
         {
             _customCpuFanSpeed = speed;
